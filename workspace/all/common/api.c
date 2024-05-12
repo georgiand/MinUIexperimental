@@ -1589,7 +1589,7 @@ static void PWR_waitForWake(void) {
 	uint32_t sleep_ticks = SDL_GetTicks();
 	while (!PAD_wake()) {
 		SDL_Delay(200);
-		if (pwr.can_poweroff && SDL_GetTicks()-sleep_ticks>=120000) { // increased to two minutes
+		if (pwr.can_poweroff && SDL_GetTicks()-sleep_ticks>=1800000) { // increased to thirty minutes
 			if (pwr.is_charging) sleep_ticks += 60000; // check again in a minute
 			else PWR_powerOff();
 		}
