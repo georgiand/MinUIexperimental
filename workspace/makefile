@@ -22,6 +22,8 @@ all:
 	cd ./all/minarch/ && make
 	cd ./all/clock/ && make
 	cd ./all/minput/ && make
+	cd ./all/clear_recent/ && make
+	
 	cd ./$(PLATFORM)/cores && make
 	cd ./$(PLATFORM) && make
 
