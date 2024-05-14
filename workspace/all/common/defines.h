@@ -25,6 +25,8 @@
 
 #define FAUX_RECENT_PATH SDCARD_PATH "/Recently Played"
 #define COLLECTIONS_PATH SDCARD_PATH "/Collections"
+#define FAVORITE_PATH SHARED_USERDATA_PATH "/.minui/favorite.txt"
+#define FAUX_FAVORITE_PATH SDCARD_PATH "/Favorites"
 
 #define LAST_PATH "/tmp/last.txt" // transient
 #define CHANGE_DISC_PATH "/tmp/change_disc.txt"
@@ -35,6 +37,7 @@
 #define TRIAD_LIGHT_GRAY 	0x7f,0x7f,0x7f
 #define TRIAD_GRAY 			0x99,0x99,0x99
 #define TRIAD_DARK_GRAY 	0x26,0x26,0x26
+#define TRIAD_GOLD	 		0xd2,0xb4,0x6c
 
 #define TRIAD_LIGHT_TEXT 	0xcc,0xcc,0xcc
 #define TRIAD_DARK_TEXT 	0x66,0x66,0x66
@@ -45,6 +48,7 @@
 #define COLOR_LIGHT_TEXT	(SDL_Color){TRIAD_LIGHT_TEXT}
 #define COLOR_DARK_TEXT		(SDL_Color){TRIAD_DARK_TEXT}
 #define COLOR_BUTTON_TEXT	(SDL_Color){TRIAD_GRAY}
+#define COLOR_GOLD			(SDL_Color){TRIAD_GOLD}
 
 // all before scale
 #define PILL_SIZE 30

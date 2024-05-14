@@ -772,11 +772,11 @@ int GFX_blitHardwareGroup(SDL_Surface* dst, int show_setting) {
 void GFX_blitHardwareHints(SDL_Surface* dst, int show_setting) {
 	if (BTN_MOD_VOLUME==BTN_SELECT && BTN_MOD_BRIGHTNESS==BTN_START) {
 		if (show_setting==1) GFX_blitButtonGroup((char*[]){ "SELECT","VOLUME",  NULL }, 0, dst, 0);
-		else GFX_blitButtonGroup((char*[]){ "START","BRIGHTNESS",  NULL }, 0, dst, 0);
+		else GFX_blitButtonGroup((char*[]){ "START","BRIGHT.",  NULL }, 0, dst, 0);
 	}
 	else {
-		if (show_setting==1) GFX_blitButtonGroup((char*[]){ BRIGHTNESS_BUTTON_LABEL,"BRIGHTNESS",  NULL }, 0, dst, 0);
-		else GFX_blitButtonGroup((char*[]){ "MENU","BRIGHTNESS",  NULL }, 0, dst, 0);
+		if (show_setting==1) GFX_blitButtonGroup((char*[]){ BRIGHTNESS_BUTTON_LABEL,"BRIGHT.",  NULL }, 0, dst, 0);
+		else GFX_blitButtonGroup((char*[]){ "MENU","BRIGHT.",  NULL }, 0, dst, 0);
 	}
 	
 }
@@ -792,14 +792,14 @@ int GFX_blitButtonGroup(char** pairs, int primary, SDL_Surface* dst, int align_r
 		char* hint;
 		char* button;
 		int ow;
-	} hints[2]; 
+	} hints[3]; 
 	int w = 0; // individual button dimension
 	int h = 0; // hints index
 	ow = 0; // full pill width
 	ox = align_right ? dst->w - SCALE1(PADDING) : SCALE1(PADDING);
 	oy = dst->h - SCALE1(PADDING + PILL_SIZE);
 	
-	for (int i=0; i<2; i++) {
+	for (int i=0; i<3; i++) {
 		if (!pairs[i*2]) break;
 		if (HAS_SKINNY_SCREEN && i!=primary) continue; // space saving
 		

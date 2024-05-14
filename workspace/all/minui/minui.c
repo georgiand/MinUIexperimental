@@ -115,6 +115,8 @@ typedef struct Entry {
 	int alpha; // index in parent Directory's alphas Array, which points to the index of an Entry in its entries Array :sweat_smile:
 } Entry;
 
+static int hasEmu(char* emu_name); 
+
 static Entry* Entry_new(char* path, int type) {
 	char display_name[256];
 	getDisplayName(path, display_name);
@@ -212,7 +214,7 @@ static void getUniqueName(Entry* entry, char* out_name) {
 }
 
 static void Directory_index(Directory* self) {
-	int skip_index = exactMatch(FAUX_RECENT_PATH, self->path) || prefixMatch(COLLECTIONS_PATH, self->path); // not alphabetized
+	int skip_index = exactMatch(FAUX_RECENT_PATH, self->path) || exactMatch(FAUX_FAVORITE_PATH, self->path) || prefixMatch(COLLECTIONS_PATH, self->path); // not alphabetized
 	
 	Hash* map = NULL;
 	char map_path[256];
@@ -315,6 +317,7 @@ static Array* getRecents(void);
 static Array* getCollection(char* path);
 static Array* getDiscs(char* path);
 static Array* getEntries(char* path);
+static Array* getFavorites(void);
 
 static Directory* Directory_new(char* path, int selected) {
 	char display_name[256];
@@ -328,6 +331,9 @@ static Directory* Directory_new(char* path, int selected) {
 	}
 	else if (exactMatch(path, FAUX_RECENT_PATH)) {
 		self->entries = getRecents();
+	}
+	else if (exactMatch(path, FAUX_FAVORITE_PATH)) {
+		self->entries = getFavorites();
 	}
 	else if (!exactMatch(path, COLLECTIONS_PATH) && prefixMatch(COLLECTIONS_PATH, path) && suffixMatch(".txt", path)) {
 		self->entries = getCollection(path);
@@ -361,6 +367,53 @@ static void DirectoryArray_free(Array* self) {
 	Array_free(self);
 }
 
+typedef struct Favorite {
+	char* path; // NOTE: this is without the SDCARD_PATH prefix!
+	int available;
+} Favorite;
+
+static Favorite* Favorite_new(char* path) {
+	Favorite* self = malloc(sizeof(Favorite));
+
+	char sd_path[256]; // only need to get emu name
+	sprintf(sd_path, "%s%s", SDCARD_PATH, path);
+
+	char emu_name[256];
+	getEmuName(sd_path, emu_name);
+
+	self->path = strdup(path);
+	self->available = hasEmu(emu_name);
+	return self;
+}
+static void Favorite_free(Favorite* self) {
+	free(self->path);
+	free(self);
+}
+
+static int FavoriteArray_indexOf(Array* self, char* str) {
+	for (int i=0; i<self->count; i++) {
+		Favorite* item = self->items[i];
+		if (exactMatch(item->path, str)) return i;
+	}
+	return -1;
+}
+static void FavoriteArray_free(Array* self) {
+	for (int i=0; i<self->count; i++) {
+		Favorite_free(self->items[i]);
+	}
+	Array_free(self);
+}
+
+static int FavoriteArray_splice(Array* self, int index) {
+	if (index != -1) {
+		for(int i=index; i<self->count-1; i++) {
+			self->items[i] = self->items[i+1];
+		}
+		--self->count;
+	}
+	return  index;
+}
+
 ///////////////////////////////////////
 
 typedef struct Recent {
@@ -371,7 +424,6 @@ typedef struct Recent {
  // yiiikes
 static char* recent_alias = NULL;
 
-static int hasEmu(char* emu_name);
 static Recent* Recent_new(char* path, char* alias) {
 	Recent* self = malloc(sizeof(Recent));
 
@@ -411,6 +463,7 @@ static void RecentArray_free(Array* self) {
 static Directory* top;
 static Array* stack; // DirectoryArray
 static Array* recents; // RecentArray
+static Array* favorites; // FavoriteArray
 
 static int quit = 0;
 static int can_resume = 0;
@@ -459,6 +512,38 @@ static void addRecent(char* path, char* alias) {
 		}
 	}
 	saveRecents();
+}
+
+static void saveFavorites(void) {
+	FILE* file = fopen(FAVORITE_PATH, "w");
+	if (file) {
+		for (int i=0; i<favorites->count; i++) {
+			Favorite* favorite = favorites->items[i];
+			fputs(favorite->path, file);
+			putc('\n', file);
+		}
+		fclose(file);
+	}
+}
+static void toggleFavorite(char* path) {
+	//printf("TEST FAV: %s\n",path);
+	path += strlen(SDCARD_PATH); // makes paths platform agnostic
+	//printf("TEST FAV: %s\n",path);
+	int id = FavoriteArray_indexOf(favorites, path);
+	//printf("TEST FAV: %s / ID = %d\n",path,id);
+	if (id==-1) { // add
+		Array_unshift(favorites, Favorite_new(path));
+	}
+	else { // remove
+		FavoriteArray_splice(favorites, id);
+	}
+	saveFavorites();
+}
+
+static int isFavorite(char *path) {
+	path += strlen(SDCARD_PATH); // makes paths platform agnostic
+	int id = FavoriteArray_indexOf(favorites, path);
+	return ++id;
 }
 
 static int hasEmu(char* emu_name) {
@@ -586,6 +671,29 @@ static int hasRecents(void) {
 	StringArray_free(parent_paths);
 	return has>0;
 }
+
+static int hasFavorites(void) {
+	FILE* file = fopen(FAVORITE_PATH, "r"); // newest at top
+	if (file) {
+		char line[256];
+		while (fgets(line,256,file)!=NULL) {
+			normalizeNewline(line);
+			trimTrailingNewlines(line);
+			if (strlen(line)==0) continue; // skip empty lines
+
+			char sd_path[256];
+			sprintf(sd_path, "%s%s", SDCARD_PATH, line);
+			if (exists(sd_path)) {
+					Favorite* favorite = Favorite_new(line);
+					Array_push(favorites, favorite);
+			}
+		}
+		fclose(file);
+	}
+	saveFavorites();
+	return 1; // Always show directory, even if empty.
+}
+
 static int hasCollections(void) {
 	int has = 0;
 	if (!exists(COLLECTIONS_PATH)) return has;
@@ -629,6 +737,7 @@ static Array* getRoot(void) {
 	Array* root = Array_new();
 	
 	if (hasRecents()) Array_push(root, Entry_new(FAUX_RECENT_PATH, ENTRY_DIR));
+	if (hasFavorites()) Array_push(root, Entry_new(FAUX_FAVORITE_PATH, ENTRY_DIR));
 	
 	Array* entries = Array_new();
 	DIR* dh = opendir(ROMS_PATH);
@@ -757,6 +866,21 @@ static Array* getRecents(void) {
 	}
 	return entries;
 }
+
+static Array* getFavorites(void) {
+	Array* entries = Array_new();
+	for (int i=0; i<favorites->count; i++) {
+		Favorite* favorite = favorites->items[i];
+		if (!favorite->available) continue;
+
+		char sd_path[256];
+		sprintf(sd_path, "%s%s", SDCARD_PATH, favorite->path);
+		int type = suffixMatch(".pak", sd_path) ? ENTRY_PAK : ENTRY_ROM; // ???
+		Array_push(entries, Entry_new(sd_path, type));
+	}
+	return entries;
+}
+
 static Array* getCollection(char* path) {
 	Array* entries = Array_new();
 	FILE* file = fopen(path, "r");
@@ -772,12 +896,6 @@ static Array* getCollection(char* path) {
 			if (exists(sd_path)) {
 				int type = suffixMatch(".pak", sd_path) ? ENTRY_PAK : ENTRY_ROM; // ???
 				Array_push(entries, Entry_new(sd_path, type));
-				
-				// char emu_name[256];
-				// getEmuName(sd_path, emu_name);
-				// if (hasEmu(emu_name)) {
-					// Array_push(entries, Entry_new(sd_path, ENTRY_ROM));
-				// }
 			}
 		}
 		fclose(file);
@@ -1205,6 +1323,22 @@ static void saveLast(char* path) {
 		// the top which is also the default selection
 		path = FAUX_RECENT_PATH;
 	}
+
+	// special case for favorites
+	if (exactMatch(top->path, FAUX_FAVORITE_PATH)) {
+		Entry* selectedEntry = top->entries->items[top->selected];
+
+		char* tmp;
+		char filename[256];
+			
+		tmp = strrchr(selectedEntry->path, '/');
+		if (tmp) strcpy(filename, tmp+1);
+			
+		char last_path[256];
+		sprintf(last_path, "%s/%s", FAUX_FAVORITE_PATH, filename);
+		path = last_path;
+	}
+
 	putFile(LAST_PATH, path);
 }
 static void loadLast(void) { // call after loading root directory
@@ -1244,7 +1378,7 @@ static void loadLast(void) { // call after loading root directory
 				Entry* entry = top->entries->items[i];
 			
 				// NOTE: strlen() is required for collated_path, '\0' wasn't reading as NULL for some reason
-				if (exactMatch(entry->path, path) || (strlen(collated_path) && prefixMatch(collated_path, entry->path)) || (prefixMatch(COLLECTIONS_PATH, full_path) && suffixMatch(filename, entry->path))) {
+				if (exactMatch(entry->path, path) || (strlen(collated_path) && prefixMatch(collated_path, entry->path)) || (prefixMatch(COLLECTIONS_PATH, full_path) && suffixMatch(filename, entry->path)) || (prefixMatch(FAUX_FAVORITE_PATH, full_path) && suffixMatch(filename, entry->path))) {
 					top->selected = i;
 					if (i>=top->end) {
 						top->start = i;
@@ -1274,12 +1408,14 @@ static void loadLast(void) { // call after loading root directory
 static void Menu_init(void) {
 	stack = Array_new(); // array of open Directories
 	recents = Array_new();
+	favorites = Array_new();
 
 	openDirectory(SDCARD_PATH, 0);
 	loadLast(); // restore state when available
 }
 static void Menu_quit(void) {
 	RecentArray_free(recents);
+	FavoriteArray_free(favorites);
 	DirectoryArray_free(stack);
 }
 
@@ -1450,6 +1586,13 @@ int main (int argc, char *argv[]) {
 
 				if (total>0) readyResume(top->entries->items[top->selected]);
 			}
+			else if (total>0 && PAD_justPressed(BTN_Y)) {
+				Entry* myentry = top->entries->items[top->selected];
+				if (myentry->type == ENTRY_ROM) {
+					toggleFavorite(myentry->path);
+					dirty = 1;
+				}
+			}
 			else if (PAD_justPressed(BTN_B) && stack->count>1) {
 				closeDirectory();
 				total = top->entries->count;
@@ -1512,8 +1655,8 @@ int main (int argc, char *argv[]) {
 					SDL_BlitSurface(commit_txt, NULL, version, &(SDL_Rect){0,SCALE1(VERSION_LINE_HEIGHT)});
 					SDL_BlitSurface(hash_txt, NULL, version, &(SDL_Rect){x,SCALE1(VERSION_LINE_HEIGHT)});
 					
-					SDL_BlitSurface(key_txt, NULL, version, &(SDL_Rect){0,SCALE1(VERSION_LINE_HEIGHT*3)});
-					SDL_BlitSurface(val_txt, NULL, version, &(SDL_Rect){x,SCALE1(VERSION_LINE_HEIGHT*3)});
+					SDL_BlitSurface(key_txt, NULL, version, &(SDL_Rect){0,SCALE1(VERSION_LINE_HEIGHT*2)});
+					SDL_BlitSurface(val_txt, NULL, version, &(SDL_Rect){x,SCALE1(VERSION_LINE_HEIGHT*2)});
 					
 					SDL_FreeSurface(release_txt);
 					SDL_FreeSurface(version_txt);
@@ -1542,6 +1685,10 @@ int main (int argc, char *argv[]) {
 						if (i==top->start) available_width -= ow;
 					
 						SDL_Color text_color = COLOR_WHITE;
+
+						if (isFavorite(entry->path)) {
+							text_color = COLOR_GOLD;
+						}
 					
 						trimSortingMeta(&entry_name);
 					
@@ -1608,7 +1755,18 @@ int main (int argc, char *argv[]) {
 				}
 				else {
 					if (stack->count>1) {
-						GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+							if (!exactMatch(top->path, COLLECTIONS_PATH)) {
+								Entry* selectedEntry = top->entries->items[top->selected];
+								if(isFavorite(selectedEntry->path)){
+									GFX_blitButtonGroup((char*[]){ "Y","UNFAV", "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+								}
+								else{
+									GFX_blitButtonGroup((char*[]){ "Y","FAV", "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+								}
+							}
+							else{
+								GFX_blitButtonGroup((char*[]){ "B","BACK", "A","OPEN", NULL }, 1, screen, 1);
+							}
 					}
 					else {
 						GFX_blitButtonGroup((char*[]){ "A","OPEN", NULL }, 0, screen, 1);
