@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <zlib.h>
+#include <pthread.h>
 
 #include "libretro.h"
 #include "defines.h"
@@ -21,9 +22,18 @@
 ///////////////////////////////////////
 
 static SDL_Surface* screen;
-static int quit;
-static int show_menu;
+static int quit = 0;
+static int show_menu = 0;
 static int simple_mode = 0;
+static int thread_video = 0;
+static int was_threaded = 0;
+static int should_run_core = 1; // used by threaded video
+
+static pthread_t		core_pt;
+static pthread_mutex_t	core_mx;
+static pthread_cond_t	core_rq; // not sure this is required
+static SDL_Surface*	backbuffer = NULL;
+static void* coreThread(void *arg);
 
 enum {
 	SCALE_NATIVE,
@@ -48,7 +58,10 @@ static int show_debug = 0;
 static int max_ff_speed = 3; // 4x
 static int fast_forward = 0;
 static int overclock = 1; // normal
+static int has_custom_controllers = 0;
+static int gamepad_type = 0; // index in gamepad_labels/gamepad_values
 static int downsample = 0; // set to 1 to convert from 8888 to 565
+
 static int DEVICE_WIDTH = FIXED_WIDTH;
 static int DEVICE_HEIGHT = FIXED_HEIGHT;
 static int DEVICE_PITCH = FIXED_PITCH;
@@ -644,6 +657,7 @@ enum {
 	FE_OPT_SHARPNESS,
 	FE_OPT_TEARING,
 	FE_OPT_OVERCLOCK,
+	FE_OPT_THREAD,
 	FE_OPT_DEBUG,
 	FE_OPT_MAXFF,
 	FE_OPT_COUNT,
@@ -776,6 +790,18 @@ static char* overclock_labels[] = {
 	NULL,
 };
 
+// TODO: this should be provided by the core
+static char* gamepad_labels[] = {
+	"Standard",
+	"DualShock",
+	NULL,
+};
+static char* gamepad_values[] = {
+	"1",
+	"517",
+	NULL,
+};
+
 enum {
 	CONFIG_NONE,
 	CONFIG_CONSOLE,
@@ -839,6 +865,16 @@ static struct Config {
 				.count = 3,
 				.values = overclock_labels,
 				.labels = overclock_labels,
+			},
+			[FE_OPT_THREAD] = {
+				.key	= "minarch_thread_video",
+				.name	= "Thread Core",
+				.desc	= "Move emulation to a thread.\nPrevents audio crackle but may\ncause dropped frames.",
+				.default_value = 0,
+				.value = 0,
+				.count = 2,
+				.values = onoff_labels,
+				.labels = onoff_labels,
 			},
 			[FE_OPT_DEBUG] = {
 				.key	= "minarch_debug_hud",
@@ -908,6 +944,7 @@ static void setOverclock(int i) {
 		case 2: PWR_setCPUSpeed(CPU_SPEED_PERFORMANCE); break;
 	}
 }
+static int toggle_thread = 0;
 static void Config_syncFrontend(char* key, int value) {
 	int i = -1;
 	if (exactMatch(key,config.frontend.options[FE_OPT_SCALING].key)) {
@@ -928,6 +965,11 @@ static void Config_syncFrontend(char* key, int value) {
 	else if (exactMatch(key,config.frontend.options[FE_OPT_TEARING].key)) {
 		prevent_tearing = value;
 		i = FE_OPT_TEARING;
+	}
+	else if (exactMatch(key,config.frontend.options[FE_OPT_THREAD].key)) {
+		int old_value = thread_video || was_threaded;
+		toggle_thread = old_value!=value;
+		i = FE_OPT_THREAD;
 	}
 	else if (exactMatch(key,config.frontend.options[FE_OPT_OVERCLOCK].key)) {
 		overclock = value;
@@ -1037,6 +1079,12 @@ static void Config_readOptionsString(char* cfg) {
 		if (!Config_getValue(cfg, option->key, value, &option->lock)) continue;
 		OptionList_setOptionValue(&config.frontend, option->key, value);
 		Config_syncFrontend(option->key, option->value);
+	}
+	
+	if (has_custom_controllers && Config_getValue(cfg,"minarch_gamepad_type",value,NULL)) {
+		gamepad_type = strtol(value, NULL, 0);
+		int device = strtol(gamepad_values[gamepad_type], NULL, 0);
+		core.set_controller_port_device(0, device);
 	}
 	
 	for (int i=0; config.core.options[i].key; i++) {
@@ -1171,6 +1219,9 @@ static void Config_write(int override) {
 		Option* option = &config.core.options[i];
 		fprintf(file, "%s = %s\n", option->key, option->values[option->value]);
 	}
+	
+	if (has_custom_controllers) fprintf(file, "%s = %i\n", "minarch_gamepad_type", gamepad_type);
+	
 	for (int i=0; config.controls[i].name; i++) {
 		ButtonMapping* mapping = &config.controls[i];
 		int j = mapping->local + 1;
@@ -1209,6 +1260,11 @@ static void Config_restore(void) {
 		option->value = option->default_value;
 	}
 	config.core.changed = 1; // let the core know
+	
+	if (has_custom_controllers) {
+		gamepad_type = 0;
+		core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+	}
 
 	for (int i=0; config.controls[i].name; i++) {
 		ButtonMapping* mapping = &config.controls[i];
@@ -1455,6 +1511,21 @@ static void Menu_afterSleep(void);
 static void Menu_saveState(void);
 static void Menu_loadState(void);
 
+static int setFastForward(int enable) {
+	if (!fast_forward && enable && thread_video) {
+		// LOG_info("entered fast forward with threaded core...\n");
+		was_threaded = 1;
+		toggle_thread = 1;
+	}
+	else if (fast_forward && !enable && !thread_video && was_threaded) {
+		// LOG_info("exited fast forward with previously threaded core...\n");
+		was_threaded = 0;
+		toggle_thread = 1;
+	}
+	fast_forward = enable;
+	return enable;
+}
+
 static uint32_t buttons = 0; // RETRO_DEVICE_ID_JOYPAD_* buttons
 static int ignore_menu = 0;
 static void input_poll_callback(void) {
@@ -1471,6 +1542,21 @@ static void input_poll_callback(void) {
 		ignore_menu = 1;
 	}
 	
+	if (PAD_justPressed(BTN_POWER)) {
+		if (thread_video) {
+			// LOG_info("pressed power with threaded core...\n");
+			was_threaded = 1;
+			toggle_thread = 1;
+		}
+	}
+	else if (PAD_justReleased(BTN_POWER)) {
+		if (!thread_video && was_threaded) {
+			// LOG_info("released power with previously threaded core before power off...\n");
+			was_threaded = 0;
+			toggle_thread = 1;
+		}
+	}
+	
 	static int toggled_ff_on = 0; // this logic only works because TOGGLE_FF is before HOLD_FF in the menu...
 	for (int i=0; i<SHORTCUT_COUNT; i++) {
 		ButtonMapping* mapping = &config.shortcuts[i];
@@ -1479,7 +1565,7 @@ static void input_poll_callback(void) {
 		if (!mapping->mod || PAD_isPressed(BTN_MENU)) {
 			if (i==SHORTCUT_TOGGLE_FF) {
 				if (PAD_justPressed(btn)) {
-					fast_forward = toggled_ff_on = !fast_forward;
+					toggled_ff_on = setFastForward(!fast_forward);
 					if (mapping->mod) ignore_menu = 1;
 					break;
 				}
@@ -1492,7 +1578,7 @@ static void input_poll_callback(void) {
 				// don't allow turn off fast_forward with a release of the hold button 
 				// if it was initially turned on with the toggle button
 				if (PAD_justPressed(btn) || (!toggled_ff_on && PAD_justReleased(btn))) {
-					fast_forward = PAD_isPressed(btn);
+					fast_forward = setFastForward(PAD_isPressed(btn));
 					if (mapping->mod) ignore_menu = 1; // very unlikely but just in case
 				}
 			}
@@ -1516,6 +1602,12 @@ static void input_poll_callback(void) {
 	
 	if (!ignore_menu && PAD_justReleased(BTN_MENU)) {
 		show_menu = 1;
+		
+		if (thread_video) {
+			pthread_mutex_lock(&core_mx);
+			should_run_core = 0;
+			pthread_mutex_unlock(&core_mx);
+		}
 	}
 	
 	// TODO: figure out how to ignore button when MENU+button is handled first
@@ -1542,10 +1634,22 @@ static void input_poll_callback(void) {
 	// if (buttons) LOG_info("buttons: %i\n", buttons);
 }
 static int16_t input_state_callback(unsigned port, unsigned device, unsigned index, unsigned id) {
-	// id == RETRO_DEVICE_ID_JOYPAD_MASK or RETRO_DEVICE_ID_JOYPAD_*
-	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0) {
+	if (port==0 && device==RETRO_DEVICE_JOYPAD && index==0) {
 		if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return buttons;
 		return (buttons >> id) & 1;
+	}
+	else if (port==0 && device==RETRO_DEVICE_ANALOG) {
+		// LOG_info("wants analog input\n");
+		if (index==RETRO_DEVICE_INDEX_ANALOG_LEFT) {
+			// LOG_info("wants left stick %i,%i\n", pad.laxis.x,pad.laxis.y);
+			if (id==RETRO_DEVICE_ID_ANALOG_X) return pad.laxis.x;
+			else if (id==RETRO_DEVICE_ID_ANALOG_Y) return pad.laxis.y;
+		}
+		else if (index==RETRO_DEVICE_INDEX_ANALOG_RIGHT) {
+			// LOG_info("wants right stick %i,%i\n", pad.raxis.x,pad.raxis.y);
+			if (id==RETRO_DEVICE_ID_ANALOG_X) return pad.raxis.x;
+			else if (id==RETRO_DEVICE_ID_ANALOG_Y) return pad.raxis.y;
+		}
 	}
 	return 0;
 }
@@ -1676,12 +1780,13 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 
 	// TODO: this is called whether using variables or options
 	case RETRO_ENVIRONMENT_GET_VARIABLE: { /* 15 */
-		// puts("RETRO_ENVIRONMENT_GET_VARIABLE");
+		// puts("RETRO_ENVIRONMENT_GET_VARIABLE ");
 		struct retro_variable *var = (struct retro_variable *)data;
 		if (var && var->key) {
 			var->value = OptionList_getOptionValue(&config.core, var->key);
 			// printf("\t%s = %s\n", var->key, var->value);
 		}
+		// fflush(stdout);
 		break;
 	}
 	// TODO: I think this is where the core reports its variables (the precursor to options)
@@ -1713,6 +1818,10 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 		// LOG_info("%i: RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK\n", cmd);
 		break;
 	}
+	case RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK: { /* 22 */
+		// LOG_info("%i: RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK\n", cmd);
+		break;
+	}
 	case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: { /* 23 */
 	        struct retro_rumble_interface *iface = (struct retro_rumble_interface*)data;
 
@@ -1720,12 +1829,12 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 	        iface->set_rumble_state = set_rumble_state;
 		break;
 	}
-	// case RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES: {
-	// 	unsigned *out = (unsigned *)data;
-	// 	if (out)
-	// 		*out = (1 << RETRO_DEVICE_JOYPAD) | (1 << RETRO_DEVICE_ANALOG);
-	// 	break;
-	// }
+	case RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES: {
+		unsigned *out = (unsigned *)data;
+		if (out)
+			*out = (1 << RETRO_DEVICE_JOYPAD) | (1 << RETRO_DEVICE_ANALOG);
+		break;
+	}
 	case RETRO_ENVIRONMENT_GET_LOG_INTERFACE: { /* 27 */
 		struct retro_log_callback *log_cb = (struct retro_log_callback *)data;
 		if (log_cb)
@@ -1738,7 +1847,25 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 			*out = core.saves_dir; // save_dir;
 		break;
 	}
-	// RETRO_ENVIRONMENT_SET_CONTROLLER_INFO 35
+	case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: { /* 35 */
+		// LOG_info("RETRO_ENVIRONMENT_SET_CONTROLLER_INFO\n");
+		const struct retro_controller_info *infos = (const struct retro_controller_info *)data;
+		if (infos) {
+			// TODO: store to gamepad_values/gamepad_labels for gamepad_device
+			const struct retro_controller_info *info = &infos[0];
+			for (int i=0; i<info->num_types; i++) {
+				const struct retro_controller_description *type = &info->types[i];
+				if (exactMatch((char*)type->desc,"dualshock")) { // currently only enabled for PlayStation
+					has_custom_controllers = 1;
+					break;
+				}
+				// printf("\t%i: %s\n", type->id, type->desc);
+			}
+		}
+		fflush(stdout);
+		return false; // TODO: tmp
+		break;
+	}
 	// RETRO_ENVIRONMENT_SET_MEMORY_MAPS (36 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_LANGUAGE 39
 	// RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS (42 | RETRO_ENVIRONMENT_EXPERIMENTAL)
@@ -2246,7 +2373,7 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	if (scaler_surface) SDL_FreeSurface(scaler_surface);
 	scaler_surface = TTF_RenderUTF8_Blended(font.tiny, scaler_name, COLOR_WHITE);
 }
-static void video_refresh_callback(const void *data, unsigned width, unsigned height, size_t pitch) {
+static void video_refresh_callback_main(const void *data, unsigned width, unsigned height, size_t pitch) {
 	// return;
 	
 	// static int tmp_frameskip = 0;
@@ -2349,10 +2476,33 @@ static void video_refresh_callback(const void *data, unsigned width, unsigned he
 		if (x>top_width) top_width = x; // keep the largest width because triple buffer
 	}
 	
-	GFX_flip(screen);
+	if (!thread_video) GFX_flip(screen);
 	last_flip_time = SDL_GetTicks();
 }
-
+static void video_refresh_callback(const void *data, unsigned width, unsigned height, size_t pitch) {
+	if (!data) return;
+	
+	if (thread_video) {
+		pthread_mutex_lock(&core_mx);
+		
+		if (backbuffer && (backbuffer->w!=width || backbuffer->h!=height || backbuffer->pitch!=pitch)) {
+			free(backbuffer->pixels);
+			SDL_FreeSurface(backbuffer);
+			backbuffer = NULL;
+		}
+		if (!backbuffer) {
+			uint16_t* pixels = malloc(height*pitch);
+			// backbuffer = SDL_CreateRGBSurface(0,width,height,FIXED_DEPTH,RGBA_MASK_565);
+			backbuffer = SDL_CreateRGBSurfaceFrom(pixels, width, height, FIXED_DEPTH, pitch, RGBA_MASK_565);
+		}
+		
+		memcpy(backbuffer->pixels, data, backbuffer->h*backbuffer->pitch);
+		
+		pthread_cond_signal(&core_rq);
+		pthread_mutex_unlock(&core_mx);
+	}
+	else video_refresh_callback_main(data,width,height,pitch);
+}
 ///////////////////////////////
 
 // NOTE: sound must be disabled for fast forward to work...
@@ -2456,9 +2606,7 @@ void Core_load(void) {
 	// NOTE: must be called after core.load_game!
 	struct retro_system_av_info av_info = {};
 	core.get_system_av_info(&av_info);
-
-	// FIX: some cores need configure a default controller.
-	core.set_controller_port_device(0, 1);
+	core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD); // set a default, may update after loading configs
 
 	core.fps = av_info.timing.fps;
 	core.sample_rate = av_info.timing.sample_rate;
@@ -2594,6 +2742,7 @@ void Menu_quit(void) {
 	SDL_FreeSurface(menu.overlay);
 }
 void Menu_beforeSleep(void) {
+	// LOG_info("beforeSleep\n");
 	SRAM_write();
 	RTC_write();
 	State_autosave();
@@ -2601,6 +2750,7 @@ void Menu_beforeSleep(void) {
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
 }
 void Menu_afterSleep(void) {
+	// LOG_info("beforeSleep\n");
 	unlink(AUTO_RESUME_PATH);
 	setOverclock(overclock);
 }
@@ -2800,6 +2950,11 @@ static int OptionEmulator_openMenu(MenuList* list, int i) {
 
 int OptionControls_bind(MenuList* list, int i) {
 	MenuItem* item = &list->items[i];
+	if (item->values!=button_labels) {
+		// LOG_info("changed gamepad_type\n");
+		return MENU_CALLBACK_NOP;
+	}
+	
 	ButtonMapping* button = &config.controls[item->id];
 	
 	int bound = 0;
@@ -2829,9 +2984,22 @@ int OptionControls_bind(MenuList* list, int i) {
 }
 static int OptionControls_unbind(MenuList* list, int i) {
 	MenuItem* item = &list->items[i];
+	if (item->values!=button_labels) return MENU_CALLBACK_NOP;
+	
 	ButtonMapping* button = &config.controls[item->id];
 	button->local = -1;
 	button->mod = 0;
+	return MENU_CALLBACK_NOP;
+}
+static int OptionControls_optionChanged(MenuList* list, int i) {
+	MenuItem* item = &list->items[i];
+	if (item->values!=gamepad_labels) return MENU_CALLBACK_NOP;
+
+	if (has_custom_controllers) {
+		gamepad_type = item->value;
+		int device = strtol(gamepad_values[item->value], NULL, 0);
+		core.set_controller_port_device(0, device);
+	}
 	return MENU_CALLBACK_NOP;
 }
 static MenuList OptionControls_menu = {
@@ -2845,10 +3013,22 @@ static MenuList OptionControls_menu = {
 };
 static int OptionControls_openMenu(MenuList* list, int i) {
 	LOG_info("OptionControls_openMenu\n");
+
 	if (OptionControls_menu.items==NULL) {
+		
 		// TODO: where do I free this?
-		OptionControls_menu.items = calloc(RETRO_BUTTON_COUNT+1, sizeof(MenuItem));
+		OptionControls_menu.items = calloc(RETRO_BUTTON_COUNT+1+has_custom_controllers, sizeof(MenuItem));
 		int k = 0;
+		
+		if (has_custom_controllers) {
+			MenuItem* item = &OptionControls_menu.items[k++];
+			item->name = "Controller";
+			item->desc = "Select the type of controller.";
+			item->value = gamepad_type;
+			item->values = gamepad_labels;
+			item->on_change = OptionControls_optionChanged;
+		}
+		
 		for (int j=0; config.controls[j].name; j++) {
 			ButtonMapping* button = &config.controls[j];
 			if (button->ignore) continue;
@@ -2867,6 +3047,12 @@ static int OptionControls_openMenu(MenuList* list, int i) {
 	else {
 		// update values
 		int k = 0;
+		
+		if (has_custom_controllers) {
+			MenuItem* item = &OptionControls_menu.items[k++];
+			item->value = gamepad_type;
+		}
+		
 		for (int j=0; config.controls[j].name; j++) {
 			ButtonMapping* button = &config.controls[j];
 			if (button->ignore) continue;
@@ -3092,30 +3278,31 @@ static int Menu_options(MenuList* list) {
 			}
 			dirty = 1;
 		}
-		else if (type!=MENU_INPUT && type!=MENU_LIST) {
-			if (PAD_justRepeated(BTN_LEFT)) {
-				MenuItem* item = &items[selected];
-				if (item->value>0) item->value -= 1;
-				else {
-					int j;
-					for (j=0; item->values[j]; j++);
-					item->value = j - 1;
+		else {
+			MenuItem* item = &items[selected];
+			if (item->values!=button_labels) { // not an input binding
+				if (PAD_justRepeated(BTN_LEFT)) {
+					if (item->value>0) item->value -= 1;
+					else {
+						int j;
+						for (j=0; item->values[j]; j++);
+						item->value = j - 1;
+					}
+				
+					if (item->on_change) item->on_change(list, selected);
+					else if (list->on_change) list->on_change(list, selected);
+				
+					dirty = 1;
 				}
+				else if (PAD_justRepeated(BTN_RIGHT)) {
+					if (item->values[item->value+1]) item->value += 1;
+					else item->value = 0;
 				
-				if (item->on_change) item->on_change(list, selected);
-				else if (list->on_change) list->on_change(list, selected);
+					if (item->on_change) item->on_change(list, selected);
+					else if (list->on_change) list->on_change(list, selected);
 				
-				dirty = 1;
-			}
-			else if (PAD_justRepeated(BTN_RIGHT)) {
-				MenuItem* item = &items[selected];
-				if (item->values[item->value+1]) item->value += 1;
-				else item->value = 0;
-				
-				if (item->on_change) item->on_change(list, selected);
-				else if (list->on_change) list->on_change(list, selected);
-				
-				dirty = 1;
+					dirty = 1;
+				}
 			}
 		}
 		
@@ -3131,7 +3318,7 @@ static int Menu_options(MenuList* list) {
 			// TODO: is there a way to defer on_confirm for MENU_INPUT so we can clear the currently set value to indicate it is awaiting input? 
 			// eg. set a flag to call on_confirm at the beginning of the next frame?
 			else if (list->on_confirm) {
-				if (type==MENU_INPUT) await_input = 1;
+				if (item->values==button_labels) await_input = 1; // button binding
 				else result = list->on_confirm(list, selected); // list-specific action, eg. show item detail view or input binding
 			}
 			if (result==MENU_CALLBACK_EXIT) show_options = 0;
@@ -3982,12 +4169,18 @@ static void Menu_loop(void) {
 		}
 		GFX_clear(screen);
 		video_refresh_callback(renderer.src, renderer.true_w, renderer.true_h, renderer.src_p);
-
+		
 		setOverclock(overclock); // restore overclock value
 		if (rumble_strength) VIB_setStrength(rumble_strength);
 		
 		GFX_setVsync(prevent_tearing);
 		if (!HAS_POWER_BUTTON) PWR_disableSleep();
+
+		if (thread_video) {
+			pthread_mutex_lock(&core_mx);
+			should_run_core = 1;
+			pthread_mutex_unlock(&core_mx);
+		}
 	}
 	
 	SDL_FreeSurface(menu.bitmap);
@@ -4069,6 +4262,22 @@ static void limitFF(void) {
 	last_time = now;
 }
 
+static void* coreThread(void *arg) {
+	while (!quit) {
+		int run = 0;
+		pthread_mutex_lock(&core_mx);
+		run = should_run_core;
+		pthread_mutex_unlock(&core_mx);
+		
+		if (run) {
+			core.run();
+			limitFF();
+			trackFPS();
+		}
+	}
+	pthread_exit(NULL);
+}
+
 int main(int argc , char* argv[]) {
 	LOG_info("MinArch\n");
 
@@ -4134,29 +4343,60 @@ int main(int argc , char* argv[]) {
 	State_resume();
 	Menu_initState(); // make ready for state shortcuts
 	
+	if (thread_video) {
+		core_mx = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+		core_rq = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+		pthread_create(&core_pt, NULL, &coreThread, NULL);
+	}
+	
 	PWR_warn(1);
 	PWR_disableAutosleep();
 	sec_start = SDL_GetTicks();
 	while (!quit) {
 		GFX_startFrame();
 		
-		core.run();
-		limitFF();
+		if (!thread_video) {
+			core.run();
+			limitFF();
+			trackFPS();
+		}
+
+		if (thread_video && !quit) {
+			pthread_mutex_lock(&core_mx);
+			pthread_cond_wait(&core_rq,&core_mx);
+			
+			if (backbuffer) {
+				video_refresh_callback_main(backbuffer->pixels,backbuffer->w,backbuffer->h,backbuffer->pitch);
+				GFX_flip(screen);
+			}
+			core_rq = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+			pthread_mutex_unlock(&core_mx);
+		}
 		
 		if (show_menu) Menu_loop();
 		
-		trackFPS();
-		
-		// TODO: this is working as expected 
-		// but I for some reason kmsdrm isn't ready 
-		// by the time we relaunch minarch
-		
-		// if (GFX_hdmiChanged()) {
-		// 	LOG_info("hdmi changed\n");
-		// 	Menu_beforeSleep();
-		// 	sleep(5);
-		// 	quit = 1;
-		// }
+		if (toggle_thread) {
+			toggle_thread = 0;
+			if (was_threaded && !thread_video) {
+				// LOG_info("was fast forwarding while previously threaded (%i) so re-enabling threading %i\n", thread_video, !thread_video);
+				// revert to pre-fast_forward state before toggling
+				was_threaded = 0;
+				thread_video = !thread_video;
+			}
+			// LOG_info("toggling thread from %i to %i\n", thread_video, !thread_video);
+			thread_video = !thread_video;
+			if (thread_video) {
+				// enable
+				core_mx = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+				core_rq = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+				pthread_create(&core_pt, NULL, &coreThread, NULL);
+			}
+			else {
+				// disable
+				pthread_cancel(core_pt);
+				pthread_join(core_pt,NULL);
+			}
+		}
 	}
 	
 	Menu_quit();
