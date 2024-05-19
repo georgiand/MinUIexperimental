@@ -75,7 +75,7 @@
 #define JOY_LEFT		15
 #define JOY_RIGHT		16
 
-#define JOY_SELECT		11 //8 (select) becomes left joystick click (11)
+#define JOY_SELECT		8
 #define JOY_START		9
 
 #define JOY_A			1
@@ -90,8 +90,8 @@
 #define JOY_L3			JOY_NA
 #define JOY_R3			JOY_NA
 
-#define JOY_MENU		8 //11 (left joystick click) becomes 8 (select)
-#define JOY_MENU_ALT	12 // right joystick click
+#define JOY_MENU		11
+#define JOY_MENU_ALT	12
 #define JOY_POWER		JOY_NA
 #define JOY_PLUS		JOY_NA
 #define JOY_MINUS		JOY_NA
