@@ -14,7 +14,7 @@ REQUIRES_COMMANDER=other/DinguxCommander
 REQUIRES_SDLCOMPAT=other/sdl12-compat
 
 all: readmes
-	# all
+	cd show && make
 	
 early: $(REQUIRES_COMMANDER) $(REQUIRES_SDLCOMPAT)/build
 	cd $(REQUIRES_COMMANDER) && make -j
@@ -22,6 +22,7 @@ early: $(REQUIRES_COMMANDER) $(REQUIRES_SDLCOMPAT)/build
 
 clean:
 	cd $(REQUIRES_COMMANDER) && make clean
+	cd show && make clean
 	cd $(REQUIRES_SDLCOMPAT) && rm -rf build
 
 ###########################################################
