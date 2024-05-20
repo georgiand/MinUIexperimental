@@ -1,14 +1,4 @@
 #include <stdio.h>
-#include <time.h>
-#include <unistd.h>
-#if defined(USE_SDL2)
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#else
-#include <SDL/SDL.h>
-#include <SDL/SDL_image.h>
-#endif
-
 #include <msettings.h>
 
 #include "defines.h"
@@ -19,22 +9,24 @@ int main(int argc, char* argv[]) {
     PWR_setCPUSpeed(CPU_SPEED_MENU);
 
     SDL_Surface* screen = GFX_init(MODE_MAIN);
+    PAD_init();
     PWR_init();
     InitSettings();
 
-    SDL_Event event;
     int quit = 0;
     int save_changes = 0;
 
     // Show confirmation message
     // GFX_blitHardwareGroup(screen, show_setting);
-    GFX_blitMessage(font.large, "Are you sure you want to clear\nRecently Played?", screen, NULL);
+    GFX_blitMessage(font.large, "Are you sure you want to clear\nRecently Played?", screen, &(SDL_Rect){0,0,screen->w,screen->h});
     GFX_blitButtonGroup((char*[]){ "B","CANCEL", "A","CLEAR", NULL },0, screen, 1);
 
     GFX_flip(screen);
 
     // Wait for user's input
     while (!quit) {
+        uint32_t frame_start = SDL_GetTicks();
+
         PAD_poll();
         if (PAD_justPressed(BTN_A)) {
             save_changes = 1;
@@ -44,6 +36,8 @@ int main(int argc, char* argv[]) {
         } else {
             GFX_sync();
         }
+
+        PWR_update(0, NULL, NULL,NULL);
     }
 
     // Execute main program based on user's input
