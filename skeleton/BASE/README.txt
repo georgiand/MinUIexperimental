@@ -34,7 +34,7 @@ TRIMUI SMART / TRIMUI SMART PRO
 
 Copy the "trimui" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
 
-MIYOO MINI
+MIYOO MINI / MIYOO A30
 
 Copy the "miyoo" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
 
@@ -52,9 +52,9 @@ MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware.
 
 Copy "/rg35xx/dmenu.bin" (just the file) to the root of the MISC partition of the TF1 card. Copy "MinUI.zip" (without unzipping) to the root of the TF2 card.
 
-RG35XX PLUS / RG35XX H / RG35XX 2024 / RG28XX
+RG35XX PLUS / RG35XX H / RG35XX 2024 / RG28XX / RG35XXSP / RG40XXH
 
-MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware. You can use the stock TF1 card, reports of its poor quality are greatly exaggerated and, as long as you are using the recommended two card setup, no userdata is stored on it. (Note that the PLUS/H/2024 stock TF1 is not compatible with the 28XX and vice versa.)
+MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware. You can use the stock TF1 card, reports of its poor quality are greatly exaggerated and, as long as you are using the recommended two card setup, no userdata is stored on it. (Note that the PLUS/H/2024/SP stock TF1 is not compatible with the 28XX/40XXH and vice versa.)
 
 Copy "/rg35xxplus/dmenu.bin" (just the file) to the root of the "NO NAME" partition (FAT32 with an "anbernic" folder) of the TF1 card. Copy "MinUI.zip" (without unzipping) to the root of the TF2 card.
 
@@ -81,7 +81,7 @@ For devices without a dedicated MENU button
 	RGB30: use L3 or R3 for MENU
 	M17:   use + or - for MENU
 
-RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL
+RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL / MIYOO A30
   
   Brightness: MENU + VOLUME UP
                   or VOLUME DOWN
@@ -89,9 +89,9 @@ RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL
 MIYOO MINI / TRIMUI SMART / M17
 
   Volume: SELECT + L or R
-  Brightness: START + L or R1
+  Brightness: START + L or R
 
-RGB30 / MIYOO MINI (PLUS) / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL
+RGB30 / MIYOO MINI (PLUS) / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL / MIYOO A30
   
   Sleep: POWER
   Wake: POWER
@@ -152,6 +152,8 @@ The m3u file would contain just:
   Policenauts (Japan) (Disc 1).cue
   Policenauts (Japan) (Disc 2).cue
 
+When a multi-disc game is detected the in-game menu's Continue item will also show the current disc. Press left or right to switch between discs.
+
 MinUI also supports chd files and official pbp files (multi-disc pbp files larger than 2GB are not supported). Regardless of the multi-disc file format used, every disc of the same game share the same memory card and save state slots.
 
 ----------------------------------------
@@ -163,6 +165,16 @@ A collection is just a text file containing an ordered list of full paths to rom
   /Roms/GB/Metroid II.gb
   /Roms/SNES (SFC)/Super Metroid.sfc
   /Roms/GBA/Metroid Fusion.gba
+
+----------------------------------------
+
+Display names
+
+Certain (unsupported arcade) cores require roms to use arcane file names. You can override the display name used throughout MinUI by creating a map.txt in the same folder as the files you want to rename. One line per file, `rom.ext` followed by a single tab followed by `Display Name`. You can hide a file by adding a `.` at the beginning of the display name. eg.
+	
+	neogeo.zip	.Neo Geo Bios
+	mslug.zip	Metal Slug
+	sf2.zip	Street Fighter II
 
 ----------------------------------------
 Simple mode
@@ -191,11 +203,22 @@ Check out neonloop's repos:
 
   https://git.crowdedwood.com
 
+To adixial and acmeplus and the entire muOS community, for sharing their discoveries for the h700 family of Anbernic devices.
+
+Check out muOS and Knulli:
+
+	https://muos.dev
+	https://knulli.org
+
 To fewt and the entire JELOS community, for JELOS (without which MinUI would not exist on the RGB30) and for sharing their knowledge with this perpetual Linux kernel novice.
 
 Check out JELOS:
 
   https://github.com/JustEnoughLinuxOS/distribution
+
+To Steward, for maintaining exhaustive documentation on a plethora of devices:
+
+	https://steward-fu.github.io/website/
 
 To BlackSeraph, for introducing me to chroot.
 
@@ -203,26 +226,10 @@ Check out the GarlicOS repos:
 
 	https://github.com/GarlicOS
 
-And to Jim Gray, for commiserating during development, for early alpha testing, and for providing the soundtrack for much of MinUI's development.
+To Jim Gray, for commiserating during development, for early alpha testing, and for providing the soundtrack for much of MinUI's development.
 
 Check out Jim's music: 
 
   https://ourghosts.bandcamp.com/music
   https://www.patreon.com/ourghosts/
-
-----------------------------------------
-Known Issues
-
-RGB30
-
-- garbage may be drawn below aspect scaled systems
-- some systems have (usually subtle) audio clipping
-- some systems need additional performance tuning
-
-TRIMUI SMART / TRIMUI SMART PRO
-
-- debug/battery overlay isn't implemented yet
-
-MIYOO MINI / MIYOO MINI PLUS
-
-- battery overlay isn't implemented yet
+ 

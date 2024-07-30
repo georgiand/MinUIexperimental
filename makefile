@@ -4,7 +4,7 @@
 # it has to, otherwise we'd be running a docker in a docker and oof
 
 ifeq (,$(PLATFORMS))
-PLATFORMS = miyoomini trimuismart rg35xx rg35xxplus tg5040 rgb30 m17 gkdpixel
+PLATFORMS = miyoomini trimuismart rg35xx rg35xxplus tg5040 rgb30 m17 gkdpixel my282
 endif
 
 ###########################################################
@@ -80,7 +80,7 @@ common: build system cores
 clean:
 	rm -rf ./build
 
-setup:
+setup: name
 	# ----------------------------------------------------
 	# make sure we're running in an input device
 	tty -s 
@@ -101,7 +101,7 @@ setup:
 	cp ./skeleton/EXTRAS/README.txt ./workspace/readmes/EXTRAS-in.txt
 	
 done:
-	say "done"
+	say "done" 2>/dev/null || true
 
 special:
 	# ----------------------------------------------------
@@ -120,6 +120,7 @@ tidy:
 	# TODO: tmp, figure out a cleaner way to do this
 	rm -rf ./build/SYSTEM/trimui
 	rm -rf ./build/EXTRAS/Tools/trimui
+	rm -rf ./build/EXTRAS/Tools/tg5040/Splore.pak
 
 package: tidy
 	# ----------------------------------------------------
@@ -192,6 +193,11 @@ m17:
 	# ----------------------------------------------------
 
 gkdpixel:
+	# ----------------------------------------------------
+	make common PLATFORM=$@
+	# ----------------------------------------------------
+
+my282:
 	# ----------------------------------------------------
 	make common PLATFORM=$@
 	# ----------------------------------------------------

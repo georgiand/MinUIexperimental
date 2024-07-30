@@ -1,31 +1,124 @@
-Please see the README.txt in the zip files for installation and update instructions.
+Changes
 
 BASE
 
-- all w/analogs: added DualShock support to PlayStation.pak.
-- rg_xx & rgb30: added Frontend > Thread Core (primarily to fix audio crackle in Nintendo.pak)
+- all: map.txt now supports marking an entry as hidden (see README.txt)
+- all: fixed crasher when binding MENU+button in Options > Controls
+- my282: revised brightness ramp again
+- my282: reverted Powersave to single core
+- rg_xx: fixed Genesis/MegaDrive on ofw 1.1.5
 
 EXTRAS
 
-- 
+- my282: updated Bootlogo.pak for Miyoo firmware 0713
+- my282: updated Bootlogo.pak with checks to prevent bricking
+- rgb30: updated native pico8 paks with controller binding checks (thanks Ry!)
+- rg_xx: updated Enable SSH.pak to properly disable itself after use
 
 ---
 
+bugs
+
+- trying to bind an input to MENU+button crashes minarch (only really affects devices without L2/R2, eg. Trimui Smart)
+
 next
-	making good progress on analog support
-		add to minput?
-			plenty of room on the rgb30
-			less so on the 35xx h
+	
+
+	patch all versions of pcsx and picodrive
+		https://github.com/shauninman/MinUI/pull/14/files#diff-d76fedd6d41fe8dd9c6a7b6066bdb39e783e6c21af2fde85415dc83d88f984df
+		related https://discord.com/channels/741895796315914271/1232969624417730630/1263579750409179271
+	
+	emu pak detection isn't working when two folders are combined
+		eg. SFC and SUPA folder but no SUPA.pak still shows games from SUPA
+	switch rgxx-line to /bin/bash to use &> instead of the grody construction I can never remember the syntax for
+		it works!
+	all
+		look into how many cores support 8888
+			this might be a bottleneck (if it's having to go 8888 to 565 and back to 8888 for every pixel, every frame)
+			not a single BASE or EXTRA core requests 8888, so that won't help even if it is a bottleneck
+			
+		Thread Core
+			needs changes to support systems that change resolution (eg. PS)
+			doesn't seem to have any affect on a30 (mostly because the problems are hi res games and the copy from cpu to gpu)
+
+		revisit bub181's core # vs freq ideas for other devices
 		
-	rg35xx sp
-		/sys/class/power_supply/axp2202-battery/hallkey (or something like that)
-			1: open
-			0: closed
+		look into RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for zero copy framebuffer
+			not sure it's really a zero copy because LockTexture has to copy the texture from the gpu to the cpu...
+		
+			GB: SDL_UnlockTexture blocked for 3ms (160,144) (TLOZ:LA)
+			PS: SDL_UnlockTexture blocked for 5ms (368,480) (TEKKEN3)
+			PS: SDL_UnlockTexture blocked for 8ms (512,480) (BR2)
+			PS: SDL_UnlockTexture blocked for 11ms (640,480) (CMR2)
+			try using SDL_UpdateTexture instead of Lock/Unlock
+				might be saving 1-2ms
+		
+		update all cores
+			call out breaking changes (gpsp save states) in release notes 
+		add Clear Recently Played.pak, copy to all platforms
+			maybe include confirmation?
+			requires show.elf
+		enable SELECT/START+L/R for volume/brightness
+		limit option name replacements based on core lib name
+		noui
+			quit doesn't work as expected on trimuismart
+			possibly because of absense of shutdown?
+	h700
+		can taskset be used to mitigate the audio issues
+		hijack boot earlier?
+			hangs boot
+			reflashing a fresh stock image takes too long to happily trial and error this
+			was able to "takeover" /etc/init.d/launcher.sh and inject it into systemd's basic.target
+				but it didn't improve boot time
+		look into using fbdev directly
+			I was able to get this working
+				SDL_NOMOUSE=1 required for SDL1.2 to work
+				WAITFORVSYNC doesn't appear to work
+				more notes in separate 28xx/notes.txt
+		
+		muos uses sdl 1.2 fbdev_mali+alsa for retroarch...which what
+			refried beans uses SDL2
+			no underruns in fceumm without threaded video...even with the sdl2 instead of default gl driver...
+			i tried copying muos libsdl2 to minui but I think I grabbed the 64bit version, is there a 32 bit version?
+				yes but it's built with a new version of glibc than stock
+				so I'm back to having to build my own rootfs
+				or building sdl2 from muos with my toolchain
+		stock uses sdl2 fbdev_mali+alsa for retroarch
+			stock retroarch has frame pacing issues in AoS/gpsp 
+				without threaded video
+				fceumm has underruns without threaded video
+		minarch has the same issues on refried muos
+			needs modified lib path (because muos is 64bit by default)
+				export LD_LIBRARY_PATH=$SYSTEM_PATH/lib:/usr/lib32
+				might have also had to hide MinUI's libSDL*
+				SDL_BLITTER_DISABLED=1 has no effect on underruns
+		
+		diff older version of stock that doesn't underrun so bad
+			compare with rg35xxplus (I don't remember having audio issues there)
+		the problem is the panel is being driven at 59fps
+		
+		rebuild using opengl?
+			based on steward-fu's work
+				https://steward-fu.github.io/website/handheld/rg28xx_cpp_es_triangle.htm
+				https://steward-fu.github.io/website/handheld/rg28xx_cpp_es_texture.htm
+			
+			# add stock libs and includes to toolchain
+			mv sysroot.tar.gz /opt
+			cd /opt
+			mkdir h700
+			tar -xvzf sysroot.tar.gz -C h700
+			rsync -a --ignore-existing /opt/h700/ /opt/rg35xxplus-toolchain/usr/arm-buildroot-linux-gnueabihf/sysroot/
+
+			# build flags
+			-lGLESv2 -lEGL -lmali -ldl
+		
+		tried building sdl2 myself it crashed and burned spectacularly
+		tried using taskset to bump priority but it already appears maxed
 		
 
-	separate BTN_UP into BTN_DPAD_UP and BTN_ANALOG_UP and OR them together?
-		at least in MinUI and menus in minarch
-	
+	/tmp/noui
+		show poweroff on quit in minarch if present
+		tricky because of thread core option...
 
 	document map.txt
 		allow hiding files with map, eg. neogeo.bios .neogeo.bios
@@ -34,11 +127,10 @@ next
 	pretty sure nothing uses the various platform.h BUTTON_* macros (because SDLK_* mappings are so spotty on these devices)
 		pretty sure they all use CODE_* or JOY_* now
 
-	macos (for modern compiler and debugging tools not for release!)
+	macos (for modern compiler and debugging tools, not for release!)
 		minarch
 	
 	rg35xxplus/h
-		auto.sh isn't working here
 		figure out
 			audio crackle on quit sdl
 				setting raw volume to 0 doesn't fix
@@ -96,8 +188,7 @@ next
 		add Developer.pak
 			only for devices with adb or ssh
 			
-		rewrite Shortcuts section by device not the tangle mess it currently is
-			Shortcuts section? I have no idea what this means
+		rewrite Shortcuts section of readme by device not the tangle mess it currently is
 			maybe do the same for all?
 			break out platforms into completely separate installers/updaters?
 				will require revisiting unzipping system
@@ -121,8 +212,22 @@ next
 		wifi
 			Splore.pak can pull updated lists from bbs but cannot download carts
 				no idea why
-			this seems to be necessary to enable wifi even if operstat is up (is that just hardware status versus online status??)
-				udhcpc -i wlan0 -S -t 5 -T 7 -b -q
+				wget works on stock so I'm failing to initiaize the network properly
+					this gets ping working: udhcpc -i wlan0
+					but wget is not compiled with ssl support
+					the following did not work to enable opkg to install/update wget
+					
+						echo "src/gz openwrt_core_cortexa53 http://downloads.openwrt.org/snapshots/packages/aarch64_cortex-a53/packages" > /etc/opkg/customfeeds.conf
+						echo "src/gz openwrt_core_sunxi http://downloads.openwrt.org/snapshots/targets/sunxi/cortexa53/packages" >> /etc/opkg/customfeeds.conf
+						
+						no valid architecture
+					just remap wget calls to curl (which has ssl support)
+			need to patch pico8_64
+			
+				xxd old > old.hex
+				xxd new > new.hex
+				diff -u old.hex new.hex > pico8_64.patch
+						
 		n64
 			requires libretro opengl implementation
 		psp
@@ -170,20 +275,13 @@ next
 		
 known issues
 	all: race core (NGP/C.pak) doesn't restore audio state correctly
-	miyoomini: debug/battery overlay isn't implemented
-	trimuismart: debug/battery overlay isn't available/implemented
 	rgb30: light crackling in some cores (eg. fceumm and snes9x2005_plus)
-	rgb30: debug/battery overlay isn't available/implemented
-	tg5040: debug/battery overlay isn't available/implemented
-
 	trimui: hw scaling isn't implemented yet
-	trimui: debug/battery overlay isn't implemented yet
 	nano: says it can bind MENU+button for shortcuts, it can't
 
 all
 	minarch
 		GFX_blitMessage() screen w/h is 0,0 for some reason
-		doesn't pickup on core setting ratio changes? eg. fceumm
 		prevent MENU+button from triggering button
 		prevent binding same MENU+button to control and shortcut at same time
 			reset the newer input to None and show a message, ideal something like:
@@ -204,9 +302,6 @@ all
 		move all the CORE_* vars up to all/cores (since they ended up all being the same)
 		there has got to be a better way to main these patches
 			updating fake-08 was so much copy/pasting
-	api
-		GFX_blitDebug(text,x,y)?
-			simple for everything but trimuismart with its -90° screen
 	minui
 		alt tag is getting truncated, should be added after truncation
 	add a "res" (or "many"?) folder 

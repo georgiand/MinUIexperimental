@@ -221,6 +221,8 @@ void PAD_poll_SDL(void);
 int PAD_wake_SDL(void);
 #endif
 
+void PAD_setAnalog(int neg, int pos, int value, int repeat_at); // internal
+
 void PAD_reset(void);
 int PAD_anyJustPressed(void);
 int PAD_anyPressed(void);
@@ -257,8 +259,6 @@ void PWR_powerOff(void);
 int PWR_isPoweringOff(void);
 
 void PWR_fauxSleep(void);
-void PWR_requestSleep(void);
-void PWR_requestWake(void);
 
 void PWR_disableSleep(void);
 void PWR_enableSleep(void);

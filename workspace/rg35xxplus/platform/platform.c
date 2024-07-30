@@ -21,23 +21,6 @@
 
 ///////////////////////////////
 
-#define LID_PATH "/sys/class/power_supply/axp2202-battery/hallkey"
-static pthread_t lid_pt;
-static void* PLAT_lidThread(void *arg) {
-	static int lid_open = 1;
-	while (1) {
-		int lid = getInt(LID_PATH);
-		if (lid!=lid_open) {
-			lid_open = lid;
-			if (lid) PWR_requestWake();
-			else PWR_requestSleep();
-		}
-		SDL_Delay(500);
-	}
-}
-
-///////////////////////////////
-
 #define RAW_UP		103
 #define RAW_DOWN	108
 #define RAW_LEFT	105
@@ -71,20 +54,29 @@ static void* PLAT_lidThread(void *arg) {
 #define INPUT_COUNT 2
 static int inputs[INPUT_COUNT];
 
+#define LID_PATH "/sys/class/power_supply/axp2202-battery/hallkey"
+static int check_lid = 0;
+static int lid_open = 1;
+int PLAT_lidChanged(int* state) {
+	if (check_lid) {
+		int lid = getInt(LID_PATH);
+		if (lid!=lid_open) {
+			lid_open = lid;
+			if (state) *state = lid;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void PLAT_initInput(void) {
 	inputs[0] = open("/dev/input/event0", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 	inputs[1] = open("/dev/input/event1", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-	
-	if (exists(LID_PATH)) pthread_create(&lid_pt, NULL, &PLAT_lidThread, NULL);
+	check_lid = exists(LID_PATH);
 }
 void PLAT_quitInput(void) {
 	for (int i=0; i<INPUT_COUNT; i++) {
 		close(inputs[i]);
-	}
-	
-	if (exists(LID_PATH)) {
-		pthread_cancel(lid_pt);
-		pthread_join(lid_pt,NULL);
 	}
 }
 
@@ -134,10 +126,10 @@ void PLAT_pollInput(void) {
 			
 				pressed = value;
 				// LOG_info("key event: %i (%i)\n", code,pressed);
-					 if (code==RAW_UP) 	{ btn = BTN_UP; 		id = BTN_ID_UP; }
-	 			else if (code==RAW_DOWN)	{ btn = BTN_DOWN; 		id = BTN_ID_DOWN; }
-				else if (code==RAW_LEFT)	{ btn = BTN_LEFT; 		id = BTN_ID_LEFT; }
-				else if (code==RAW_RIGHT)	{ btn = BTN_RIGHT; 		id = BTN_ID_RIGHT; }
+					 if (code==RAW_UP) 		{ btn = BTN_DPAD_UP; 	id = BTN_ID_DPAD_UP; }
+	 			else if (code==RAW_DOWN)	{ btn = BTN_DPAD_DOWN; 	id = BTN_ID_DPAD_DOWN; }
+				else if (code==RAW_LEFT)	{ btn = BTN_DPAD_LEFT; 	id = BTN_ID_DPAD_LEFT; }
+				else if (code==RAW_RIGHT)	{ btn = BTN_DPAD_RIGHT; id = BTN_ID_DPAD_RIGHT; }
 				else if (code==RAW_A)		{ btn = BTN_A; 			id = BTN_ID_A; }
 				else if (code==RAW_B)		{ btn = BTN_B; 			id = BTN_ID_B; }
 				else if (code==RAW_X)		{ btn = BTN_X; 			id = BTN_ID_X; }
@@ -189,8 +181,8 @@ void PLAT_pollInput(void) {
 						}
 					}
 				}
-				else if (code==RAW_LSX) pad.laxis.x = (value / 4096) * 32767;
-				else if (code==RAW_LSY) pad.laxis.y = (value / 4096) * 32767;
+				else if (code==RAW_LSX) { pad.laxis.x = (value / 4096) * 32767; PAD_setAnalog(BTN_ID_ANALOG_LEFT, BTN_ID_ANALOG_RIGHT, pad.laxis.x, tick+PAD_REPEAT_DELAY); }
+				else if (code==RAW_LSY) { pad.laxis.y = (value / 4096) * 32767; PAD_setAnalog(BTN_ID_ANALOG_UP,   BTN_ID_ANALOG_DOWN,  pad.laxis.y, tick+PAD_REPEAT_DELAY); }
 				else if (code==RAW_RSX) pad.raxis.x = (value / 4096) * 32767;
 				else if (code==RAW_RSY) pad.raxis.y = (value / 4096) * 32767;
 				
@@ -212,15 +204,24 @@ void PLAT_pollInput(void) {
 			}
 		}
 	}
+	
+	if (check_lid && PLAT_lidChanged(NULL)) pad.just_released |= BTN_SLEEP;
 }
 
 int PLAT_shouldWake(void) {
+	int lid = 1; // assume open by default
+	if (check_lid && PLAT_lidChanged(&lid) && lid) return 1;
+	
 	int input;
 	static struct input_event event;
 	for (int i=0; i<INPUT_COUNT; i++) {
 		input = inputs[i];
 		while (read(input, &event, sizeof(event))==sizeof(event)) {
-			if (event.type==EV_KEY && event.code==RAW_POWER && event.value==0) return 1;
+			if (event.type==EV_KEY && event.code==RAW_POWER && event.value==0) {
+				// ignore input while lid is closed
+				if (check_lid && !lid_open) return 0;  // do it here so we eat the input
+				return 1;
+			}
 		}
 	}
 	return 0;
@@ -253,6 +254,8 @@ static int device_height;
 static int device_pitch;
 static int rotate = 0;
 SDL_Surface* PLAT_initVideo(void) {
+	// LOG_info("PLAT_initVideo\n");
+	
 	SDL_InitSubSystem(SDL_INIT_VIDEO);
 	SDL_ShowCursor(0);
 	
@@ -292,9 +295,9 @@ SDL_Surface* PLAT_initVideo(void) {
 	// for (int i=0; i<SDL_GetNumAudioDrivers(); i++) {
 	// 	LOG_info("- %s\n", SDL_GetAudioDriver(i));
 	// }
-	// LOG_info("Current audio driver: %s\n", SDL_GetCurrentAudioDriver());
+	// LOG_info("Current audio driver: %s\n", SDL_GetCurrentAudioDriver()); // NOTE: hadn't been selected yet so will always be NULL!
 
-	// SDL_SetHint(SDL_HINT_RENDER_VSYNC,"0");
+	// SDL_SetHint(SDL_HINT_RENDER_VSYNC,"0"); // ignored
 
 	int w = FIXED_WIDTH;
 	int h = FIXED_HEIGHT;
@@ -475,23 +478,16 @@ void PLAT_blitRenderer(GFX_Renderer* renderer) {
 void PLAT_flip(SDL_Surface* IGNORED, int ignored) {
 	if (!vid.blit) {
 		resizeVideo(device_width,device_height,FIXED_PITCH); // !!!???
-		SDL_LockTexture(vid.texture,NULL,&vid.buffer->pixels,&vid.buffer->pitch);
-		SDL_BlitSurface(vid.screen, NULL, vid.buffer, NULL);
-		SDL_UnlockTexture(vid.texture);
+		SDL_UpdateTexture(vid.texture,NULL,vid.screen->pixels,vid.screen->pitch);
 		if (rotate) SDL_RenderCopyEx(vid.renderer,vid.texture,NULL,&(SDL_Rect){0,device_width,device_width,device_height},rotate*90,&(SDL_Point){0,0},SDL_FLIP_NONE);
 		else SDL_RenderCopy(vid.renderer, vid.texture, NULL,NULL);
 		SDL_RenderPresent(vid.renderer);
 		return;
 	}
 	
-	SDL_LockTexture(vid.texture,NULL,&vid.buffer->pixels,&vid.buffer->pitch);
-	((scaler_t)vid.blit->blit)(
-		vid.blit->src,vid.buffer->pixels,
-		// vid.blit->src_w,vid.blit->src_h,vid.blit->src_p,
-		vid.blit->true_w,vid.blit->true_h,vid.blit->src_p, // TODO: fix to be confirmed, issue may not present on this platform
-		vid.buffer->w,vid.buffer->h,vid.buffer->pitch
-	);
-	SDL_UnlockTexture(vid.texture);
+	// uint32_t then = SDL_GetTicks();
+	SDL_UpdateTexture(vid.texture,NULL,vid.blit->src,vid.blit->src_p);
+	// LOG_info("blit blocked for %ims (%i,%i)\n", SDL_GetTicks()-then,vid.buffer->w,vid.buffer->h);
 	
 	SDL_Texture* target = vid.texture;
 	int w = vid.blit->src_w;
@@ -540,7 +536,9 @@ void PLAT_flip(SDL_Surface* IGNORED, int ignored) {
 	ox = -oy;
 	if (rotate) SDL_RenderCopyEx(vid.renderer,target,src_rect,&(SDL_Rect){ox+dst_rect->x,oy+dst_rect->y,dst_rect->w,dst_rect->h},rotate*90,NULL,SDL_FLIP_NONE);
 	else SDL_RenderCopy(vid.renderer, target, src_rect, dst_rect);
+	// uint32_t then = SDL_GetTicks();
 	SDL_RenderPresent(vid.renderer);
+	// LOG_info("SDL_RenderPresent blocked for %ims\n", SDL_GetTicks()-then);
 	vid.blit = NULL;
 }
 
@@ -593,14 +591,18 @@ void PLAT_getBatteryStatus(int* is_charging, int* charge) {
 	online = prefixMatch("up", status);
 }
 
+#define BLANK_PATH "/sys/class/graphics/fb0/blank"
+#define LED_PATH "/sys/class/power_supply/axp2202-battery/work_led"
 void PLAT_enableBacklight(int enable) {
 	if (enable) {
+		putInt(BLANK_PATH, FB_BLANK_UNBLANK); // wake
 		SetBrightness(GetBrightness());
-		system("echo 0 > /sys/class/power_supply/axp2202-battery/work_led");
+		putInt(LED_PATH,0);
 	}
 	else {
+		putInt(BLANK_PATH, FB_BLANK_POWERDOWN); // sleep
 		SetRawBrightness(0);
-		system("echo 1 > /sys/class/power_supply/axp2202-battery/work_led");
+		putInt(LED_PATH,1);
 	}
 }
 
@@ -634,9 +636,7 @@ void PLAT_setCPUSpeed(int speed) {
 #define RUMBLE_PATH "/sys/class/power_supply/axp2202-battery/moto"
 
 void PLAT_setRumble(int strength) {
-	char cmd[256];
-	sprintf(cmd,"echo %i > %s", strength?1:0, RUMBLE_PATH);
-	system(cmd);
+	putInt(RUMBLE_PATH, strength?1:0);
 }
 
 int PLAT_pickSampleRate(int requested, int max) {
@@ -645,8 +645,13 @@ int PLAT_pickSampleRate(int requested, int max) {
 
 static char model[256];
 char* PLAT_getModel(void) {
-	// sadly there is nothing distinguishable about the hardware...
-	return "RG*XX Family";
+	// firmware "strings /mnt/vendor/bin/dmenu.bin | grep ^20"
+	char* _model = getenv("RGXX_MODEL");
+	if (_model!=NULL) {
+		sprintf(model, "Anbernic %s", _model);
+		return model;
+	}
+	return "Anbernic RG*XX";
 }
 
 int PLAT_isOnline(void) {

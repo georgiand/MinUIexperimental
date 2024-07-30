@@ -666,6 +666,7 @@ enum {
 	SHORTCUT_SAVE_STATE,
 	SHORTCUT_LOAD_STATE,
 	SHORTCUT_RESET_GAME,
+	SHORTCUT_SAVE_QUIT,
 	SHORTCUT_CYCLE_SCALE,
 	SHORTCUT_TOGGLE_FF,
 	SHORTCUT_HOLD_FF,
@@ -685,10 +686,10 @@ typedef struct ButtonMapping {
 } ButtonMapping;
 
 static ButtonMapping default_button_mapping[] = { // used if pak.cfg doesn't exist or doesn't have bindings
-	{"Up",			RETRO_DEVICE_ID_JOYPAD_UP,		BTN_ID_UP},
-	{"Down",		RETRO_DEVICE_ID_JOYPAD_DOWN,	BTN_ID_DOWN},
-	{"Left",		RETRO_DEVICE_ID_JOYPAD_LEFT,	BTN_ID_LEFT},
-	{"Right",		RETRO_DEVICE_ID_JOYPAD_RIGHT,	BTN_ID_RIGHT},
+	{"Up",			RETRO_DEVICE_ID_JOYPAD_UP,		BTN_ID_DPAD_UP},
+	{"Down",		RETRO_DEVICE_ID_JOYPAD_DOWN,	BTN_ID_DPAD_DOWN},
+	{"Left",		RETRO_DEVICE_ID_JOYPAD_LEFT,	BTN_ID_DPAD_LEFT},
+	{"Right",		RETRO_DEVICE_ID_JOYPAD_RIGHT,	BTN_ID_DPAD_RIGHT},
 	{"A Button",	RETRO_DEVICE_ID_JOYPAD_A,		BTN_ID_A},
 	{"B Button",	RETRO_DEVICE_ID_JOYPAD_B,		BTN_ID_B},
 	{"X Button",	RETRO_DEVICE_ID_JOYPAD_X,		BTN_ID_X},
@@ -705,10 +706,10 @@ static ButtonMapping default_button_mapping[] = { // used if pak.cfg doesn't exi
 };
 static ButtonMapping button_label_mapping[] = { // used to lookup the retro_id and local btn_id from button name
 	{"NONE",	-1,								BTN_ID_NONE},
-	{"UP",		RETRO_DEVICE_ID_JOYPAD_UP,		BTN_ID_UP},
-	{"DOWN",	RETRO_DEVICE_ID_JOYPAD_DOWN,	BTN_ID_DOWN},
-	{"LEFT",	RETRO_DEVICE_ID_JOYPAD_LEFT,	BTN_ID_LEFT},
-	{"RIGHT",	RETRO_DEVICE_ID_JOYPAD_RIGHT,	BTN_ID_RIGHT},
+	{"UP",		RETRO_DEVICE_ID_JOYPAD_UP,		BTN_ID_DPAD_UP},
+	{"DOWN",	RETRO_DEVICE_ID_JOYPAD_DOWN,	BTN_ID_DPAD_DOWN},
+	{"LEFT",	RETRO_DEVICE_ID_JOYPAD_LEFT,	BTN_ID_DPAD_LEFT},
+	{"RIGHT",	RETRO_DEVICE_ID_JOYPAD_RIGHT,	BTN_ID_DPAD_RIGHT},
 	{"A",		RETRO_DEVICE_ID_JOYPAD_A,		BTN_ID_A},
 	{"B",		RETRO_DEVICE_ID_JOYPAD_B,		BTN_ID_B},
 	{"X",		RETRO_DEVICE_ID_JOYPAD_X,		BTN_ID_X},
@@ -726,22 +727,22 @@ static ButtonMapping button_label_mapping[] = { // used to lookup the retro_id a
 static ButtonMapping core_button_mapping[RETRO_BUTTON_COUNT+1] = {0};
 
 static const char* device_button_names[LOCAL_BUTTON_COUNT] = {
-	[BTN_ID_UP]		= "UP",
-	[BTN_ID_DOWN]	= "DOWN",
-	[BTN_ID_LEFT]	= "LEFT",
-	[BTN_ID_RIGHT]	= "RIGHT",
-	[BTN_ID_SELECT]	= "SELECT",
-	[BTN_ID_START]	= "START",
-	[BTN_ID_Y]		= "Y",
-	[BTN_ID_X]		= "X",
-	[BTN_ID_B]		= "B",
-	[BTN_ID_A]		= "A",
-	[BTN_ID_L1]		= "L1",
-	[BTN_ID_R1]		= "R1",
-	[BTN_ID_L2]		= "L2",
-	[BTN_ID_R2]		= "R2",
-	[BTN_ID_L3]		= "L3",
-	[BTN_ID_R3]		= "R3",
+	[BTN_ID_DPAD_UP]	= "UP",
+	[BTN_ID_DPAD_DOWN]	= "DOWN",
+	[BTN_ID_DPAD_LEFT]	= "LEFT",
+	[BTN_ID_DPAD_RIGHT]	= "RIGHT",
+	[BTN_ID_SELECT]		= "SELECT",
+	[BTN_ID_START]		= "START",
+	[BTN_ID_Y]			= "Y",
+	[BTN_ID_X]			= "X",
+	[BTN_ID_B]			= "B",
+	[BTN_ID_A]			= "A",
+	[BTN_ID_L1]			= "L1",
+	[BTN_ID_R1]			= "R1",
+	[BTN_ID_L2]			= "L2",
+	[BTN_ID_R2]			= "R2",
+	[BTN_ID_L3]			= "L3",
+	[BTN_ID_R3]			= "R3",
 };
 
 
@@ -909,6 +910,7 @@ static struct Config {
 		[SHORTCUT_SAVE_STATE]			= {"Save State",		-1, BTN_ID_NONE, 0},
 		[SHORTCUT_LOAD_STATE]			= {"Load State",		-1, BTN_ID_NONE, 0},
 		[SHORTCUT_RESET_GAME]			= {"Reset Game",		-1, BTN_ID_NONE, 0},
+		[SHORTCUT_SAVE_QUIT]			= {"Save & Quit",		-1, BTN_ID_NONE, 0},
 		[SHORTCUT_CYCLE_SCALE]			= {"Cycle Scaling",		-1, BTN_ID_NONE, 0},
 		[SHORTCUT_TOGGLE_FF]			= {"Toggle FF",			-1, BTN_ID_NONE, 0},
 		[SHORTCUT_HOLD_FF]				= {"Hold FF",			-1, BTN_ID_NONE, 0},
@@ -1599,6 +1601,10 @@ static void input_poll_callback(void) {
 					case SHORTCUT_SAVE_STATE: Menu_saveState(); break;
 					case SHORTCUT_LOAD_STATE: Menu_loadState(); break;
 					case SHORTCUT_RESET_GAME: core.reset(); break;
+					case SHORTCUT_SAVE_QUIT:
+						Menu_saveState();
+						quit = 1;
+						break;
 					case SHORTCUT_CYCLE_SCALE:
 						screen_scaling += 1;
 						if (screen_scaling>=SCALE_COUNT) screen_scaling -= SCALE_COUNT;
@@ -1636,6 +1642,14 @@ static void input_poll_callback(void) {
 		ButtonMapping* mapping = &config.controls[i];
 		int btn = 1 << mapping->local;
 		if (btn==BTN_NONE) continue; // present buttons can still be unbound
+		if (gamepad_type==0) {
+			switch(btn) {
+				case BTN_DPAD_UP: 		btn = BTN_UP; break;
+				case BTN_DPAD_DOWN: 	btn = BTN_DOWN; break;
+				case BTN_DPAD_LEFT: 	btn = BTN_LEFT; break;
+				case BTN_DPAD_RIGHT: 	btn = BTN_RIGHT; break;
+			}
+		}
 		if (PAD_isPressed(btn) && (!mapping->mod || PAD_isPressed(BTN_MENU))) {
 			buttons |= 1 << mapping->retro;
 			if (mapping->mod) ignore_menu = 1;
@@ -1651,14 +1665,11 @@ static int16_t input_state_callback(unsigned port, unsigned device, unsigned ind
 		return (buttons >> id) & 1;
 	}
 	else if (port==0 && device==RETRO_DEVICE_ANALOG) {
-		// LOG_info("wants analog input\n");
 		if (index==RETRO_DEVICE_INDEX_ANALOG_LEFT) {
-			// LOG_info("wants left stick %i,%i\n", pad.laxis.x,pad.laxis.y);
 			if (id==RETRO_DEVICE_ID_ANALOG_X) return pad.laxis.x;
 			else if (id==RETRO_DEVICE_ID_ANALOG_Y) return pad.laxis.y;
 		}
 		else if (index==RETRO_DEVICE_INDEX_ANALOG_RIGHT) {
-			// LOG_info("wants right stick %i,%i\n", pad.raxis.x,pad.raxis.y);
 			if (id==RETRO_DEVICE_ID_ANALOG_X) return pad.raxis.x;
 			else if (id==RETRO_DEVICE_ID_ANALOG_Y) return pad.raxis.y;
 		}
@@ -1880,6 +1891,11 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 	}
 	// RETRO_ENVIRONMENT_SET_MEMORY_MAPS (36 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_LANGUAGE 39
+	case RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER: { /* (40 | RETRO_ENVIRONMENT_EXPERIMENTAL) */
+		// puts("RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER");
+		break;
+	}
+	
 	// RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS (42 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_VFS_INTERFACE (45 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 	// RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | RETRO_ENVIRONMENT_EXPERIMENTAL)
@@ -2097,6 +2113,218 @@ static void MSG_quit(void) {
 
 ///////////////////////////////
 
+static const char* bitmap_font[] = {
+	['0'] = 
+		" 111 "
+		"1   1"
+		"1   1"
+		"1  11"
+		"1 1 1"
+		"11  1"
+		"1   1"
+		"1   1"
+		" 111 ",
+	['1'] =
+		"   1 "
+		" 111 "
+		"   1 "
+		"   1 "
+		"   1 "
+		"   1 "
+		"   1 "
+		"   1 "
+		"   1 ",
+	['2'] =
+		" 111 "
+		"1   1"
+		"    1"
+		"   1 "
+		"  1  "
+		" 1   "
+		"1    "
+		"1    "
+		"11111",
+	['3'] =
+		" 111 "
+		"1   1"
+		"    1"
+		"    1"
+		" 111 "
+		"    1"
+		"    1"
+		"1   1"
+		" 111 ",
+	['4'] =
+		"1   1"
+		"1   1"
+		"1   1"
+		"1   1"
+		"1   1"
+		"1   1"
+		"11111"
+		"    1"
+		"    1",
+	['5'] =
+		"11111"
+		"1    "
+		"1    "
+		"1111 "
+		"    1"
+		"    1"
+		"    1"
+		"1   1"
+		" 111 ",
+	['6'] =
+		" 111 "
+		"1    "
+		"1    "
+		"1111 "
+		"1   1"
+		"1   1"
+		"1   1"
+		"1   1"
+		" 111 ",
+	['7'] =
+		"11111"
+		"    1"
+		"    1"
+		"   1 "
+		"  1  "
+		"  1  "
+		"  1  "
+		"  1  "
+		"  1  ",
+	['8'] =
+		" 111 "
+		"1   1"
+		"1   1"
+		"1   1"
+		" 111 "
+		"1   1"
+		"1   1"
+		"1   1"
+		" 111 ",
+	['9'] =
+		" 111 "
+		"1   1"
+		"1   1"
+		"1   1"
+		"1   1"
+		" 1111"
+		"    1"
+		"    1"
+		" 111 ",
+	['.'] = 
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		" 11  "
+		" 11  ",
+	[','] = 
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"  1  "
+		"  1  "
+		" 1   ",
+	[' '] = 
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     "
+		"     ",
+	['('] = 
+		"   1 "
+		"  1  "
+		" 1   "
+		" 1   "
+		" 1   "
+		" 1   "
+		" 1   "
+		"  1  "
+		"   1 ",
+	[')'] = 
+		" 1   "
+		"  1  "
+		"   1 "
+		"   1 "
+		"   1 "
+		"   1 "
+		"   1 "
+		"  1  "
+		" 1   ",
+	['/'] = 
+		"   1 "
+		"   1 "
+		"   1 "
+		"  1  "
+		"  1  "
+		"  1  "
+		" 1   "
+		" 1   "
+		" 1   ",
+	['x'] = 
+		"     "
+		"     "
+		"1   1"
+		"1   1"
+		" 1 1 "
+		"  1  "
+		" 1 1 "
+		"1   1"
+		"1   1",
+	['%'] = 
+		" 1   "
+		"1 1  "
+		"1 1 1"
+		" 1 1 "
+		"  1  "
+		" 1 1 "
+		"1 1 1"
+		"  1 1"
+		"   1 ",
+};
+static void blitBitmapText(char* text, int ox, int oy, uint16_t* data, int stride, int width, int height) {
+	#define CHAR_WIDTH 5
+	#define CHAR_HEIGHT 9
+	#define LETTERSPACING 1
+	
+	int len = strlen(text);
+	int w = ((CHAR_WIDTH+LETTERSPACING)*len)-1;
+	int h = CHAR_HEIGHT;
+	
+	if (ox<0) ox = width-w+ox;
+	if (oy<0) oy = height-h+oy;
+	
+	data += oy * stride + ox;
+	for (int y=0; y<CHAR_HEIGHT; y++) {
+		uint16_t* row = data + y * stride;
+		memset(row, 0, w*2);
+		for (int i=0; i<len; i++) {
+			const char* c = bitmap_font[text[i]];
+			for (int x=0; x<CHAR_WIDTH; x++) {
+				int j = y * CHAR_WIDTH + x;
+				if (c[j]=='1') *row = 0xffff;
+				row++;
+			}
+			row += LETTERSPACING;
+		}
+	}
+}
+
+///////////////////////////////
+
 static int cpu_ticks = 0;
 static int fps_ticks = 0;
 static int use_ticks = 0;
@@ -2104,8 +2332,6 @@ static double fps_double = 0;
 static double cpu_double = 0;
 static double use_double = 0;
 static uint32_t sec_start = 0;
-
-static SDL_Surface* scaler_surface;
 
 #ifdef USES_SWSCALER
 	static int fit = 1;
@@ -2380,10 +2606,6 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 	// if (screen->w!=dst_w || screen->h!=dst_w || screen->pitch!=dst_p) {
 		screen = GFX_resize(dst_w,dst_h,dst_p);
 	// }
-	
-	// DEBUG HUD
-	if (scaler_surface) SDL_FreeSurface(scaler_surface);
-	scaler_surface = TTF_RenderUTF8_Blended(font.tiny, scaler_name, COLOR_WHITE);
 }
 static void video_refresh_callback_main(const void *data, unsigned width, unsigned height, size_t pitch) {
 	// return;
@@ -2423,10 +2645,20 @@ static void video_refresh_callback_main(const void *data, unsigned width, unsign
 	}
 	
 	// debug
-	static int top_width = 0;
-	static int bottom_width = 0;
-	if (top_width) SDL_FillRect(screen, &(SDL_Rect){0,0,top_width,DIGIT_HEIGHT}, RGB_BLACK);
-	if (bottom_width) SDL_FillRect(screen, &(SDL_Rect){0,screen->h-DIGIT_HEIGHT,bottom_width,DIGIT_HEIGHT}, RGB_BLACK);
+	if (show_debug) {
+		char debug_text[128];
+		sprintf(debug_text, "%ix%i %ix", renderer.src_w,renderer.src_h, renderer.scale);
+		blitBitmapText(debug_text,2,2,(uint16_t*)data,pitch/2, width,height);
+
+		sprintf(debug_text, "%i,%i %ix%i", renderer.dst_x,renderer.dst_y, renderer.src_w*renderer.scale,renderer.src_h*renderer.scale);
+		blitBitmapText(debug_text,-2,2,(uint16_t*)data,pitch/2, width,height);
+	
+		sprintf(debug_text, "%.01f/%.01f %i%%", fps_double, cpu_double, (int)use_double);
+		blitBitmapText(debug_text,2,-2,(uint16_t*)data,pitch/2, width,height);
+	
+		sprintf(debug_text, "%ix%i", renderer.dst_w,renderer.dst_h);
+		blitBitmapText(debug_text,-2,-2,(uint16_t*)data,pitch/2, width,height);
+	}
 	
 	if (downsample) {
 		buffer_downsample(data,width,height,pitch*2);
@@ -2438,55 +2670,6 @@ static void video_refresh_callback_main(const void *data, unsigned width, unsign
 	renderer.dst = screen->pixels;
 	// LOG_info("video_refresh_callback: %ix%i@%i %ix%i@%i\n",width,height,pitch,screen->w,screen->h,screen->pitch);
 	GFX_blitRenderer(&renderer);
-	
-	if (show_debug) {
-		int x = 0;
-		int y = screen->h - SCALE1(DIGIT_HEIGHT);
-#if defined(USE_SDL2)
-		y = height - SCALE1(DIGIT_HEIGHT); // TODO: tmp?
-#endif
-		
-		if (fps_double) x = MSG_blitDouble(fps_double, x,y);
-		
-		if (cpu_double) {
-			x = MSG_blitChar(DIGIT_SLASH,x,y);
-			x = MSG_blitDouble(cpu_double, x,y);
-		}
-		
-		if (use_double) {
-			x = MSG_blitChar(DIGIT_SPACE,x,y);
-			x = MSG_blitDouble(use_double, x,y);
-			x = MSG_blitChar(DIGIT_PERCENT,x,y);
-		}
-		
-		if (x>bottom_width) bottom_width = x; // keep the largest width because triple buffer
-		
-		x = 0;
-		y = 0;
-		
-		// src res
-		x = MSG_blitInt(renderer.src_w,x,y);
-		x = MSG_blitChar(DIGIT_X,x,y);
-		x = MSG_blitInt(renderer.src_h,x,y);
-		
-		x = MSG_blitChar(DIGIT_SPACE,x,y);
-		
-		// dst res
-		x = MSG_blitChar(DIGIT_OP,x,y);
-		x = MSG_blitInt(renderer.dst_w,x,y);
-		x = MSG_blitChar(DIGIT_X,x,y);
-		x = MSG_blitInt(renderer.dst_h,x,y);
-		x = MSG_blitChar(DIGIT_CP,x,y);
-		x = MSG_blitChar(DIGIT_SPACE,x,y);
-		
-		if (scaler_surface) {
-			SDL_FillRect(screen, &(SDL_Rect){x,y,scaler_surface->w,SCALE1(DIGIT_HEIGHT)}, RGB_BLACK);
-			SDL_BlitSurface(scaler_surface, NULL, screen, &(SDL_Rect){x,y+((SCALE1(DIGIT_HEIGHT) - scaler_surface->h)/2)});
-			x += SCALE1(DIGIT_WIDTH) * 3;
-		}
-		
-		if (x>top_width) top_width = x; // keep the largest width because triple buffer
-	}
 	
 	if (!thread_video) GFX_flip(screen);
 	last_flip_time = SDL_GetTicks();
@@ -2626,7 +2809,7 @@ void Core_load(void) {
 	if (a<=0) a = (double)av_info.geometry.base_width / av_info.geometry.base_height;
 	core.aspect_ratio = a;
 	
-	LOG_info("aspect_ratio: %f fps: %f\n", a, core.fps);
+	LOG_info("aspect_ratio: %f (%ix%i) fps: %f\n", a, av_info.geometry.base_width,av_info.geometry.base_height, core.fps);
 }
 void Core_reset(void) {
 	core.reset();
@@ -2826,8 +3009,6 @@ static int Menu_message(char* message, char** pairs) {
 	return MENU_CALLBACK_NOP; // TODO: this should probably be an arg
 }
 
-#define OPTION_PADDING 8
-#define MAX_VISIBLE_OPTIONS 7
 static int Menu_options(MenuList* list);
 
 static int MenuList_freeItems(MenuList* list, int i) {
@@ -3223,6 +3404,8 @@ static void OptionSaveChanges_updateDesc(void) {
 	options_menu.items[4].desc = getSaveDesc();
 }
 
+#define OPTION_PADDING 8
+
 static int Menu_options(MenuList* list) {
 	MenuItem* items = list->items;
 	int type = list->type;
@@ -3232,11 +3415,14 @@ static int Menu_options(MenuList* list) {
 	int show_settings = 0;
 	int await_input = 0;
 	
+	// dependent on option list offset top and bottom, eg. the gray triangles
+	int max_visible_options = (screen->h - ((SCALE1(PADDING + PILL_SIZE) * 2) + SCALE1(BUTTON_SIZE))) / SCALE1(BUTTON_SIZE); // 7 for 480, 10 for 720
+	
 	int count;
 	for (count=0; items[count].name; count++);
 	int selected = 0;
 	int start = 0;
-	int end = MIN(count,MAX_VISIBLE_OPTIONS);
+	int end = MIN(count,max_visible_options);
 	int visible_rows = end;
 	
 	OptionSaveChanges_updateDesc();
@@ -3268,7 +3454,7 @@ static int Menu_options(MenuList* list) {
 			selected -= 1;
 			if (selected<0) {
 				selected = count - 1;
-				start = MAX(0,count - MAX_VISIBLE_OPTIONS);
+				start = MAX(0,count - max_visible_options);
 				end = count;
 			}
 			else if (selected<start) {
@@ -3292,7 +3478,7 @@ static int Menu_options(MenuList* list) {
 		}
 		else {
 			MenuItem* item = &items[selected];
-			if (item->values!=button_labels) { // not an input binding
+			if (item->values && item->values!=button_labels) { // not an input binding
 				if (PAD_justRepeated(BTN_LEFT)) {
 					if (item->value>0) item->value -= 1;
 					else {
@@ -3572,7 +3758,7 @@ static int Menu_options(MenuList* list) {
 				}
 			}
 			
-			if (count>MAX_VISIBLE_OPTIONS) {
+			if (count>max_visible_options) {
 				#define SCROLL_WIDTH 24
 				#define SCROLL_HEIGHT 4
 				int ox = (screen->w - SCALE1(SCROLL_WIDTH))/2;
@@ -4194,6 +4380,7 @@ static void Menu_loop(void) {
 			pthread_mutex_unlock(&core_mx);
 		}
 	}
+	else if (exists(NOUI_PATH)) PWR_powerOff(); // TODO: won't work with threaded core, only check this once per launch
 	
 	SDL_FreeSurface(menu.bitmap);
 	menu.bitmap = NULL;
@@ -4275,6 +4462,11 @@ static void limitFF(void) {
 }
 
 static void* coreThread(void *arg) {
+	// force a vsync immediately before loop
+	// for better frame pacing?
+	GFX_clearAll();
+	GFX_flip(screen);
+	
 	while (!quit) {
 		int run = 0;
 		pthread_mutex_lock(&core_mx);
@@ -4363,6 +4555,12 @@ int main(int argc , char* argv[]) {
 	
 	PWR_warn(1);
 	PWR_disableAutosleep();
+	
+	// force a vsync immediately before loop
+	// for better frame pacing?
+	GFX_clearAll();
+	GFX_flip(screen);
+	
 	sec_start = SDL_GetTicks();
 	while (!quit) {
 		GFX_startFrame();
@@ -4407,6 +4605,11 @@ int main(int argc , char* argv[]) {
 				// disable
 				pthread_cancel(core_pt);
 				pthread_join(core_pt,NULL);
+				
+				// force a vsync immediately before loop
+				// for better frame pacing?
+				GFX_clearAll();
+				GFX_flip(screen);
 			}
 		}
 	}
