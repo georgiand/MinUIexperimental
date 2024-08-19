@@ -16,7 +16,9 @@ libretro-common
 **/squashfs/output
 
 **/other/evtest
+**/other/dtc
 **/other/sdl
+**/other/sdl2
 **/other/sdl12-compat
 **/other/unzip60
 **/other/DinguxCommander
