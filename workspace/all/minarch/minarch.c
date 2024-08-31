@@ -388,7 +388,9 @@ static void Game_changeDisc(char* path) {
 ///////////////////////////////////////
 
 static void SRAM_getPath(char* filename) {
-	sprintf(filename, "%s/%s.sav", core.saves_dir, game.name);
+	char rom_name[256]; 
+	removeExtension(game.name, rom_name);
+	sprintf(filename, "%s/%s.srm", core.saves_dir, rom_name);
 }
 static void SRAM_read(void) {
 	size_t sram_size = core.get_memory_size(RETRO_MEMORY_SAVE_RAM);
@@ -487,7 +489,9 @@ static void RTC_write(void) {
 
 static int state_slot = 0;
 static void State_getPath(char* filename) {
-	sprintf(filename, "%s/%s.st%i", core.states_dir, game.name, state_slot);
+	char rom_name[256]; 
+	removeExtension(game.name, rom_name);
+	sprintf(filename, "%s/%s.st%i", core.states_dir, rom_name, state_slot);
 }
 static void State_read(void) { // from picoarch
 	size_t state_size = core.serialize_size();

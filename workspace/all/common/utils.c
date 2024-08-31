@@ -198,3 +198,11 @@ uint64_t getMicroseconds(void) {
 
     return ret;
 }
+
+void removeExtension(const char* in_name, char* out_name) {
+	strcpy(out_name, in_name);
+    char *dot = strrchr(out_name, '.');  // Find the last dot in the string
+    if (dot && dot != out_name) {        // Check if the dot exists and is not the first character
+        *dot = '\0';                     // Replace the dot with a null terminator, truncating the string
+    }
+}

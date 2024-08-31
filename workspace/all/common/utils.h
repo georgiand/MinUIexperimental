@@ -26,4 +26,6 @@ int getInt(char* path);
 
 uint64_t getMicroseconds(void);
 
+void removeExtension(const char* in_name, char* out_name);
+
 #endif
