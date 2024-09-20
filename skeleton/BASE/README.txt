@@ -1,4 +1,4 @@
-MinUI is a minimal launcher for the Trimui Smart (and Pro), the Miyoo Mini (and Plus) and A30, the Powkiddy RGB30, the M17, and the Anbernic RG*XX family--all from the same SD card. Why? Why not?
+MinUI is a minimal launcher for the Trimui Smart (and Pro), the Miyoo Mini (and Plus) and A30, the Powkiddy RGB30, the M17, the MagicX XU Mini M, and the Anbernic RG*XX family--all from the same SD card. Why? Why not?
 
 Source:
 https://github.com/shauninman/minui
@@ -29,6 +29,14 @@ MinUI is meant to be used with Moss installed on the SD card that goes into the 
 	https://github.com/shauninman/Moss/releases/
 
 Copy "MinUI.zip" (without unzipping) to the root of the SD card that goes into the right slot (labeled TFGAME) of the RGB30.
+
+MAGICX XU MINI M
+
+MinUI is meant to be used with a heavily modified stock SD card that goes into the left slot (labeled TF1/INT). Download and flash the latest version:
+
+	https://github.com/shauninman/Moss-magicmini/releases
+
+Copy "MinUI.zip" (without unzipping) to the root of the SD card that goes into the right slot (labeled TF2/EXT).
 
 TRIMUI SMART / TRIMUI SMART PRO
 
@@ -83,7 +91,7 @@ For devices without a dedicated MENU button
 	RGB30: use L3 or R3 for MENU
 	M17:   use + or - for MENU
 
-RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL / MIYOO A30
+RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL / MIYOO A30 / MAGICX XU MINI M
   
   Brightness: MENU + VOLUME UP
                   or VOLUME DOWN
@@ -221,6 +229,12 @@ Check out JELOS:
 To Steward, for maintaining exhaustive documentation on a plethora of devices:
 
 	https://steward-fu.github.io/website/
+
+To Gamma, for his efforts unlocking more performance on the MagicX XU Mini M (before we all realized its RG3562 was surreptitiously an RK3266).
+
+Check out his repos (including GammaOS):
+
+	https://github.com/TheGammaSqueeze/
 
 To BlackSeraph, for introducing me to chroot.
 

@@ -1,5 +1,7 @@
 #!/bin/sh
 
+overclock.elf performance 2 1200 384 1080 0
+
 DIR="$(dirname "$0")"
 cd "$DIR"
 

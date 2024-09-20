@@ -929,7 +929,7 @@ static struct SND_Context {
 	int sample_rate_out;
 	
 	int buffer_seconds;     // current_audio_buffer_size
-	SND_Frame* buffer;	// buf
+	SND_Frame* buffer;		// buf
 	size_t frame_count; 	// buf_len
 	
 	int frame_in;     // buf_w
@@ -961,15 +961,10 @@ static void SND_audioCallback(void* userdata, uint8_t* stream, int len) { // pla
 		if (snd.frame_out>=snd.frame_count) snd.frame_out = 0;
 	}
 	
-	// if (len>0) memset(out,0,len*(sizeof(int16_t) * 2));
-	
-	
 	int zero = len>0 && len==SAMPLES;
 	if (zero) return (void)memset(out,0,len*(sizeof(int16_t) * 2));
 	// else if (len>=5) LOG_info("%8i BUFFER UNDERRUN (%i frames)\n", ms(), len);
 
-	// TODO: this produces crazy static on tg5040
-	// TODO: test with the in>stream addition
 	int16_t *in = out-1;
 	while (len>0) {
 		*out++ = (void*)in>(void*)stream ? *--in : 0;
@@ -1163,12 +1158,13 @@ void PAD_setAnalog(int neg_id,int pos_id,int value,int repeat_at) {
 }
 
 void PAD_reset(void) {
+	// LOG_info("PAD_reset");
 	pad.just_pressed = BTN_NONE;
 	pad.is_pressed = BTN_NONE;
 	pad.just_released = BTN_NONE;
 	pad.just_repeated = BTN_NONE;
 }
-void PAD_poll_SDL(void) {
+FALLBACK_IMPLEMENTATION void PLAT_pollInput(void) {
 	// reset transient state
 	pad.just_pressed = BTN_NONE;
 	pad.just_released = BTN_NONE;
@@ -1321,7 +1317,7 @@ void PAD_poll_SDL(void) {
 		}
 	}
 }
-int PAD_wake_SDL(void) {
+FALLBACK_IMPLEMENTATION int PLAT_shouldWake(void) {
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		if (event.type==SDL_KEYUP) {
