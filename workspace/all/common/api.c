@@ -55,6 +55,8 @@ uint32_t RGB_LIGHT_GRAY;
 uint32_t RGB_GRAY;
 uint32_t RGB_DARK_GRAY;
 
+int POWEROFF_TIMEOUT = 120000;
+
 static struct GFX_Context {
 	SDL_Surface* screen;
 	SDL_Surface* assets;
@@ -1632,7 +1634,7 @@ static void PWR_waitForWake(void) {
 			break;
 		}
 		SDL_Delay(200);
-		if (pwr.can_poweroff && SDL_GetTicks()-sleep_ticks>=1800000) { // increased to thirty minutes
+		if (pwr.can_poweroff && SDL_GetTicks()-sleep_ticks>=POWEROFF_TIMEOUT) {
 			if (pwr.is_charging) sleep_ticks += 60000; // check again in a minute
 			else PWR_powerOff();
 		}

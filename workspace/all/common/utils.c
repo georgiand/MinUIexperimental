@@ -206,3 +206,32 @@ void removeExtension(const char* in_name, char* out_name) {
         *dot = '\0';                     // Replace the dot with a null terminator, truncating the string
     }
 }
+
+// Function to check if a string contains only digits
+int isValidNumber(const char *str) {
+    for (int i = 0; str[i] != '\0'; i++) {
+        if (!isdigit(str[i])) {
+            return 0;  // Not a valid number
+        }
+    }
+    return 1;
+}
+
+void convertMillisecondsToTime(int milliseconds, int *hour_value, int *minute_value, int *second_value) {
+	// Total seconds from the milliseconds
+	long total_seconds = milliseconds / 1000;
+
+	// Calculate hours, minutes, and seconds
+	*hour_value = total_seconds / 3600;            // 1 hour = 3600 seconds
+	*minute_value = (total_seconds % 3600) / 60;   // Remaining minutes
+	*second_value = total_seconds % 60;            // Remaining seconds
+}
+
+int convertTimeToMilliseconds(int hour_value, int minute_value, int second_value) {
+// Convert time to milliseconds
+int milliseconds = (hour_value * 3600 * 1000)  // Hours to milliseconds
+					+ (minute_value * 60 * 1000)  // Minutes to milliseconds
+					+ (second_value * 1000);      // Seconds to milliseconds
+
+return milliseconds;
+}

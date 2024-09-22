@@ -27,5 +27,9 @@ int getInt(char* path);
 uint64_t getMicroseconds(void);
 
 void removeExtension(const char* in_name, char* out_name);
+int isValidNumber(const char *str);
+
+void convertMillisecondsToTime(int milliseconds, int *hour_value, int *minute_value, int *second_value);
+int convertTimeToMilliseconds(int hour_value, int minute_value, int second_value);
 
 #endif

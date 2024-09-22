@@ -57,6 +57,8 @@ extern uint32_t RGB_LIGHT_GRAY;
 extern uint32_t RGB_GRAY;
 extern uint32_t RGB_DARK_GRAY;
 
+extern int POWEROFF_TIMEOUT;
+
 enum {
 	ASSET_WHITE_PILL,
 	ASSET_BLACK_PILL,

@@ -15,22 +15,12 @@ endif
 .PHONY: all
 
 all:
-	cd ./$(PLATFORM)/libmsettings && make
-	cd ./$(PLATFORM) && make early # eg. other libs
-	cd ./$(PLATFORM)/keymon && make
 	cd ./all/minui/ && make
 	cd ./all/minarch/ && make
-	cd ./all/clock/ && make
-	cd ./all/minput/ && make
-	cd ./all/syncsettings/ && make
 	cd ./all/clear_recent/ && make
-	
-	cd ./$(PLATFORM)/cores && make
-	cd ./$(PLATFORM) && make
+	cd ./all/set_poweroff_timeout/ && make
 
 clean:
-	cd ./$(PLATFORM)/libmsettings && make clean
-	cd ./$(PLATFORM)/keymon && make clean
 	cd ./all/minui/ && make clean
 	cd ./all/minarch/ && make clean
 	cd ./$(PLATFORM) && make clean

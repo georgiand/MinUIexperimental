@@ -8,6 +8,9 @@
 #define BRIGHTNESS_MIN 	0
 #define BRIGHTNESS_MAX 	10
 
+#define POWEROFF_TIMEOUT_PATH SHARED_USERDATA_PATH "/poweroff_timeout.txt"
+#define POWEROFF_TIMEOUT_MAX_LEN 20
+
 #define MAX_PATH 512
 
 #define ROMS_PATH SDCARD_PATH "/Roms"

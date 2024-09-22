@@ -1432,6 +1432,33 @@ static void Menu_quit(void) {
 
 ///////////////////////////////////////
 
+static int setPoweroffTimeout(void) {
+	// Check if the timeout file exists
+	if (!exists(POWEROFF_TIMEOUT_PATH)) return 0;
+    
+    // Buffer to hold the timeout value read from file
+    char timeout_str[POWEROFF_TIMEOUT_MAX_LEN];
+    
+    // Read the timeout value from the file
+    getFile(POWEROFF_TIMEOUT_PATH, timeout_str, POWEROFF_TIMEOUT_MAX_LEN);
+
+    // Ensure the timeout value read is a valid number
+    if (!isValidNumber(timeout_str)) return 0;  
+    
+    // Convert the valid timeout value to an integer
+    int timeout_value = atoi(timeout_str);
+    
+    // Ensure the timeout value is a positive number
+    if (timeout_value <= 0) return 0;
+    
+    // Update the POWEROFF_TIMEOUT variable with the valid timeout value
+    POWEROFF_TIMEOUT = timeout_value;
+    
+    return 1; 
+}
+
+///////////////////////////////////////
+
 int main (int argc, char *argv[]) {
 	if (autoResume()) return 0; // nothing to do
 	
@@ -1448,6 +1475,8 @@ int main (int argc, char *argv[]) {
 	SDL_Surface* version = NULL;
 	
 	Menu_init();
+
+	setPoweroffTimeout();
 	
 	// now that (most of) the heavy lifting is done, take a load off
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
