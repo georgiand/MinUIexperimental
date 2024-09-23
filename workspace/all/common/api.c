@@ -55,8 +55,6 @@ uint32_t RGB_LIGHT_GRAY;
 uint32_t RGB_GRAY;
 uint32_t RGB_DARK_GRAY;
 
-int POWEROFF_TIMEOUT = 120000;
-
 static struct GFX_Context {
 	SDL_Surface* screen;
 	SDL_Surface* assets;
@@ -1626,15 +1624,40 @@ static void PWR_exitSleep(void) {
 	sync();
 }
 
+long getPoweroffTimeout(void) {
+	// Check if the timeout file exists, otherwise return default value of 2 minutes
+	if (!exists(POWEROFF_TIMEOUT_PATH)) return 120000;
+    
+    // Buffer to hold the timeout value read from file
+    char timeout_str[POWEROFF_TIMEOUT_MAX_LEN];
+    
+    // Read the timeout value from the file
+    getFile(POWEROFF_TIMEOUT_PATH, timeout_str, POWEROFF_TIMEOUT_MAX_LEN);
+
+    // Ensure the timeout value read is a valid number, otherwise return default value of 2 minutes
+    if (!isValidNumber(timeout_str)) return 120000;  
+    
+    // Convert the valid timeout value to an integer
+    int timeout_value = atol(timeout_str);
+    
+    // Ensure the timeout value is a positive number, otherwise return default value of 2 minutes
+    if (timeout_value <= 0) return 120000;
+    
+    // If all is correct, return the timeout value read from the file
+    return timeout_value;
+}
+
 static void PWR_waitForWake(void) {
 	uint32_t sleep_ticks = SDL_GetTicks();
+	long poweroff_timeout = getPoweroffTimeout();
+	
 	while (!PAD_wake()) {
 		if (pwr.requested_wake) {
 			pwr.requested_wake = 0;
 			break;
 		}
 		SDL_Delay(200);
-		if (pwr.can_poweroff && SDL_GetTicks()-sleep_ticks>=POWEROFF_TIMEOUT) {
+		if (pwr.can_poweroff && SDL_GetTicks()-sleep_ticks>=poweroff_timeout) {
 			if (pwr.is_charging) sleep_ticks += 60000; // check again in a minute
 			else PWR_powerOff();
 		}
@@ -1677,5 +1700,3 @@ int PLAT_setDateTime(int y, int m, int d, int h, int i, int s) {
 	sprintf(cmd, "date -u -s '%d-%d-%d %d:%d:%d'; hwclock --utc -w", y,m,d,h,i,s);
 	system(cmd);
 }
-
-
