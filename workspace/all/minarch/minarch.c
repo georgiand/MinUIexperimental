@@ -491,7 +491,11 @@ static int state_slot = 0;
 static void State_getPath(char* filename) {
 	char rom_name[256]; 
 	removeExtension(game.name, rom_name);
-	sprintf(filename, "%s/%s.st%i", core.states_dir, rom_name, state_slot);
+	if(state_slot == 0){
+		sprintf(filename, "%s/%s.state", core.states_dir, rom_name);
+	}else{
+		sprintf(filename, "%s/%s.state%i", core.states_dir, rom_name, state_slot);
+	}
 }
 static void State_read(void) { // from picoarch
 	size_t state_size = core.serialize_size();
@@ -1230,7 +1234,6 @@ static void Config_readControls(void) {
 }
 static void Config_write(int override) {
 	char path[MAX_PATH];
-	// sprintf(path, "%s/%s.cfg", core.config_dir, game.name);
 	Config_getPath(path, CONFIG_WRITE_GAME);
 	
 	if (!override) {
@@ -2817,7 +2820,7 @@ void Core_open(const char* core_path, const char* tag_name) {
 	LOG_info("core: %s version: %s tag: %s (valid_extensions: %s need_fullpath: %i)\n", core.name, core.version, core.tag, info.valid_extensions, info.need_fullpath);
 	
 	sprintf((char*)core.config_dir, USERDATA_PATH "/%s-%s", core.tag, core.name);
-	sprintf((char*)core.states_dir, SHARED_USERDATA_PATH "/%s-%s", core.tag, core.name);
+	sprintf((char*)core.states_dir, SDCARD_PATH "/States/%s", core.tag);
 	sprintf((char*)core.saves_dir, SDCARD_PATH "/Saves/%s", core.tag);
 	sprintf((char*)core.bios_dir, SDCARD_PATH "/Bios/%s", core.tag);
 	
@@ -2947,7 +2950,10 @@ void Menu_init(void) {
 	sprintf(menu.minui_dir, SHARED_USERDATA_PATH "/.minui/%s", emu_name);
 	mkdir(menu.minui_dir, 0755);
 
-	sprintf(menu.slot_path, "%s/%s.txt", menu.minui_dir, game.name);
+	char rom_name[256]; 
+	removeExtension(game.name, rom_name);
+
+	sprintf(menu.slot_path, "%s/%s.txt", menu.minui_dir, rom_name);
 	
 	if (simple_mode) menu.items[ITEM_OPTS] = "Reset";
 	
@@ -3997,14 +4003,19 @@ static void Menu_updateState(void) {
 
 	state_slot = last_slot;
 
-	sprintf(menu.bmp_path, "%s/%s.%d.bmp", menu.minui_dir, game.name, menu.slot);
-	sprintf(menu.txt_path, "%s/%s.%d.txt", menu.minui_dir, game.name, menu.slot);
+	char rom_name[256]; 
+	removeExtension(game.name, rom_name);
+
+	if(menu.slot == 0){
+		sprintf(menu.bmp_path, "%s/%s.bmp", menu.minui_dir, rom_name);
+		sprintf(menu.txt_path, "%s/%s.txt", menu.minui_dir, rom_name);
+	}else{
+		sprintf(menu.bmp_path, "%s/%s.%d.bmp", menu.minui_dir, rom_name, menu.slot);
+		sprintf(menu.txt_path, "%s/%s.%d.txt", menu.minui_dir, rom_name, menu.slot);
+	}
 	
 	menu.save_exists = exists(save_path);
 	menu.preview_exists = menu.save_exists && exists(menu.bmp_path);
-
-	// LOG_info("save_path: %s (%i)\n", save_path, menu.save_exists);
-	// LOG_info("bmp_path: %s txt_path: %s (%i)\n", menu.bmp_path, menu.txt_path, menu.preview_exists);
 }
 static void Menu_saveState(void) {
 	// LOG_info("Menu_saveState\n");
