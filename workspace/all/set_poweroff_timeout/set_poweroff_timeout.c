@@ -89,10 +89,14 @@ int main(int argc , char* argv[]) {
 		// time
 		if (hour_selected > 23) hour_selected -= 24;
 		else if (hour_selected < 0) hour_selected += 24;
+
 		if (minute_selected > 59) minute_selected -= 60;
 		else if (minute_selected < 0) minute_selected += 60;
+
 		if (seconds_selected > 59) seconds_selected -= 60;
 		else if (seconds_selected < 0) seconds_selected += 60;
+		
+		if (hour_selected == 0 && minute_selected == 0 && seconds_selected == 0) seconds_selected = 1;
 	}
 	
 	int option_count = 3;
