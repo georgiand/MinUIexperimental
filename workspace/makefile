@@ -23,4 +23,6 @@ all:
 clean:
 	cd ./all/minui/ && make clean
 	cd ./all/minarch/ && make clean
+	cd ./all/clear_recent/ && make clean
+	cd ./all/set_poweroff_timeout/ && make clean
 	cd ./$(PLATFORM) && make clean
