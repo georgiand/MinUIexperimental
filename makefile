@@ -3,6 +3,13 @@
 # NOTE: this runs on the host system (eg. macOS) not in a docker image
 # it has to, otherwise we'd be running a docker in a docker and oof
 
+# prevent accidentally triggering a full build with invalid calls
+ifneq (,$(PLATFORM))
+ifeq (,$(MAKECMDGOALS))
+$(error found PLATFORM arg but no target, did you mean "make PLATFORM=$(PLATFORM) shell"?)
+endif
+endif
+
 ifeq (,$(PLATFORMS))
 PLATFORMS = miyoomini trimuismart rg35xx rg35xxplus tg5040 rgb30 m17 gkdpixel my282 magicmini
 endif
@@ -52,7 +59,6 @@ cores: # TODO: can't assume every platform will have the same stock cores (platf
 	cp ./workspace/$(PLATFORM)/cores/output/gambatte_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
 	cp ./workspace/$(PLATFORM)/cores/output/gpsp_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
 	cp ./workspace/$(PLATFORM)/cores/output/picodrive_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
-ifneq ($(PLATFORM),trimui)
 	cp ./workspace/$(PLATFORM)/cores/output/snes9x2005_plus_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
 	cp ./workspace/$(PLATFORM)/cores/output/pcsx_rearmed_libretro.so ./build/SYSTEM/$(PLATFORM)/cores
 	
@@ -73,7 +79,6 @@ endif
 ifneq ($(PLATFORM),gkdpixel)
 	cp ./workspace/$(PLATFORM)/cores/output/mednafen_supafaust_libretro.so ./build/EXTRAS/Emus/$(PLATFORM)/SUPA.pak
 	cp ./workspace/$(PLATFORM)/cores/output/mednafen_vb_libretro.so ./build/EXTRAS/Emus/$(PLATFORM)/VB.pak
-endif
 endif
 
 common: build system cores
@@ -119,9 +124,7 @@ tidy:
 	# remove systems we're not ready to support yet
 	
 	# TODO: tmp, figure out a cleaner way to do this
-	rm -rf ./build/SYSTEM/trimui
-	rm -rf ./build/EXTRAS/Tools/trimui
-	rm -rf ./build/EXTRAS/Tools/tg5040/Splore.pak
+	rm -rf ./build/EXTRAS/Tools/tg5040/Developer.pak
 
 package: tidy
 	# ----------------------------------------------------
@@ -169,11 +172,6 @@ miyoomini:
 	# ----------------------------------------------------
 
 trimuismart:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-trimui:
 	# ----------------------------------------------------
 	make common PLATFORM=$@
 	# ----------------------------------------------------
