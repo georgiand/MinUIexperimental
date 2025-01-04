@@ -39,15 +39,9 @@ enum {
 	SCALE_NATIVE,
 	SCALE_ASPECT,
 	SCALE_FULLSCREEN,
-#ifdef CROP_OVERSCAN
 	SCALE_CROPPED,
-#endif
 	SCALE_COUNT,
 };
-
-#ifndef CROP_OVERSCAN
-	int SCALE_CROPPED = -1;
-#endif
 
 // default frontend options
 static int screen_scaling = SCALE_ASPECT;
@@ -62,9 +56,10 @@ static int has_custom_controllers = 0;
 static int gamepad_type = 0; // index in gamepad_labels/gamepad_values
 static int downsample = 0; // set to 1 to convert from 8888 to 565
 
-static int DEVICE_WIDTH = FIXED_WIDTH;
-static int DEVICE_HEIGHT = FIXED_HEIGHT;
-static int DEVICE_PITCH = FIXED_PITCH;
+// these are no longer constants as of the RG CubeXX (even though they look like it)
+static int DEVICE_WIDTH = 0; // FIXED_WIDTH;
+static int DEVICE_HEIGHT = 0; // FIXED_HEIGHT;
+static int DEVICE_PITCH = 0; // FIXED_PITCH;
 
 GFX_Renderer renderer;
 
@@ -629,9 +624,7 @@ static char* scaling_labels[] = {
 	"Native",
 	"Aspect",
 	"Fullscreen",
-#ifdef CROP_OVERSCAN
 	"Cropped",
-#endif
 	NULL
 };
 static char* effect_labels[] = {
@@ -825,10 +818,24 @@ enum {
 	CONFIG_GAME,
 };
 
+static inline char* getScreenScalingDesc(void) {
+	if (GFX_supportsOverscan()) {
+		return "Native uses integer scaling. Aspect uses core\nreported aspect ratio. Fullscreen has non-square\npixels. Cropped is integer scaled then cropped.";
+	}
+	else {
+		return "Native uses integer scaling.\nAspect uses core reported aspect ratio.\nFullscreen has non-square pixels.";
+	}
+}
+static inline int getScreenScalingCount(void) {
+	return GFX_supportsOverscan() ? 4 : 3;
+}
+	
+
 static struct Config {
 	char* system_cfg; // system.cfg based on system limitations
 	char* default_cfg; // pak.cfg based on platform limitations
 	char* user_cfg; // minarch.cfg or game.cfg based on user preference
+	char* device_tag;
 	OptionList frontend;
 	OptionList core;
 	ButtonMapping* controls;
@@ -842,14 +849,10 @@ static struct Config {
 			[FE_OPT_SCALING] = {
 				.key	= "minarch_screen_scaling", 
 				.name	= "Screen Scaling",
-#ifdef CROP_OVERSCAN
-				.desc	= "Native uses integer scaling. Aspect uses core\nreported aspect ratio. Fullscreen has non-square\npixels. Cropped is integer scaled then cropped.",
-#else
-				.desc	= "Native uses integer scaling.\nAspect uses core reported aspect ratio.\nFullscreen has non-squarepixels.",
-#endif
+				.desc	= NULL, // will call getScreenScalingDesc()
 				.default_value = 1,
 				.value = 1,
-				.count = SCALE_COUNT,
+				.count = 3, // will call getScreenScalingCount()
 				.values = scaling_labels,
 				.labels = scaling_labels,
 			},
@@ -945,12 +948,12 @@ static struct Config {
 		{NULL}
 	},
 };
-static int Config_getValue(char* cfg, const char* key, char* out_value, int* lock) {
+static int Config_getValue(char* cfg, const char* key, char* out_value, int* lock) { // gets value from string
 	char* tmp = cfg;
 	while ((tmp = strstr(tmp, key))) {
 		if (lock!=NULL && tmp>cfg && *(tmp-1)=='-') *lock = 1; // prefixed with a `-` means lock
 		tmp += strlen(key);
-		if (!strncmp(tmp, " = ", 3)) break;
+		if (!strncmp(tmp, " = ", 3)) break; // matched
 	};
 	if (!tmp) return 0;
 	tmp += 3;
@@ -993,7 +996,10 @@ static void Config_syncFrontend(char* key, int value) {
 	}
 	else if (exactMatch(key,config.frontend.options[FE_OPT_SHARPNESS].key)) {
 		screen_sharpness = value;
-		GFX_setSharpness(value);
+		
+		if (screen_scaling==SCALE_NATIVE) GFX_setSharpness(SHARPNESS_SHARP);
+		else GFX_setSharpness(screen_sharpness);
+
 		renderer.dst_p = 0;
 		i = FE_OPT_SHARPNESS;
 	}
@@ -1028,8 +1034,11 @@ enum {
 	CONFIG_WRITE_GAME,
 };
 static void Config_getPath(char* filename, int override) {
-	if (override) sprintf(filename, "%s/%s.cfg", core.config_dir, game.name);
-	else sprintf(filename, "%s/minarch.cfg", core.config_dir);
+	char device_tag[64] = {0};
+	if (config.device_tag) sprintf(device_tag,"-%s",config.device_tag);
+	if (override) sprintf(filename, "%s/%s%s.cfg", core.config_dir, game.name, device_tag);
+	else sprintf(filename, "%s/minarch%s.cfg", core.config_dir, device_tag);
+	LOG_info("Config_getPath %s\n", filename);
 }
 static void Config_init(void) {
 	if (!config.default_cfg || config.initialized) return;
@@ -1192,17 +1201,53 @@ static void Config_readControlsString(char* cfg) {
 static void Config_load(void) {
 	LOG_info("Config_load\n");
 	
+	config.device_tag = getenv("DEVICE");
+	LOG_info("config.device_tag %s\n", config.device_tag);
+	
+	// update for crop overscan support
+	Option* scaling_option = &config.frontend.options[FE_OPT_SCALING];
+	scaling_option->desc = getScreenScalingDesc();
+	scaling_option->count = getScreenScalingCount();
+	if (!GFX_supportsOverscan()) {
+		scaling_labels[3] = NULL;
+	}
+	
 	char* system_path = SYSTEM_PATH "/system.cfg";
-	if (exists(system_path)) config.system_cfg = allocFile(system_path);
+	
+	char device_system_path[MAX_PATH] = {0};
+	if (config.device_tag) sprintf(device_system_path, SYSTEM_PATH "/system-%s.cfg", config.device_tag);
+	
+	if (config.device_tag && exists(device_system_path)) {
+		LOG_info("usng device_system_path: %s\n", device_system_path);
+		config.system_cfg = allocFile(device_system_path);
+	}
+	else if (exists(system_path)) config.system_cfg = allocFile(system_path);
 	else config.system_cfg = NULL;
+	
+	// LOG_info("config.system_cfg: %s\n", config.system_cfg);
 	
 	char default_path[MAX_PATH];
 	getEmuPath((char *)core.tag, default_path);
 	char* tmp = strrchr(default_path, '/');
 	strcpy(tmp,"/default.cfg");
+
+	char device_default_path[MAX_PATH] = {0};
+	if (config.device_tag) {
+		getEmuPath((char *)core.tag, device_default_path);
+		tmp = strrchr(device_default_path, '/');
+		char filename[64];
+		sprintf(filename,"/default-%s.cfg", config.device_tag);
+		strcpy(tmp,filename);
+	}
 	
-	if (exists(default_path)) config.default_cfg = allocFile(default_path);
+	if (config.device_tag && exists(device_default_path)) {
+		LOG_info("usng device_default_path: %s\n", device_default_path);
+		config.default_cfg = allocFile(device_default_path);
+	}
+	else if (exists(default_path)) config.default_cfg = allocFile(default_path);
 	else config.default_cfg = NULL;
+	
+	// LOG_info("config.default_cfg: %s\n", config.default_cfg);
 	
 	char path[MAX_PATH];
 	config.loaded = CONFIG_NONE;
@@ -1213,6 +1258,8 @@ static void Config_load(void) {
 	
 	config.user_cfg = allocFile(path);
 	if (!config.user_cfg) return;
+	
+	LOG_info("using user config: %s\n", path);
 	
 	config.loaded = override ? CONFIG_GAME : CONFIG_CONSOLE;
 }
@@ -1275,12 +1322,16 @@ static void Config_write(int override) {
 static void Config_restore(void) {
 	char path[MAX_PATH];
 	if (config.loaded==CONFIG_GAME) {
-		sprintf(path, "%s/%s.cfg", core.config_dir, game.name);
+		if (config.device_tag) sprintf(path, "%s/%s-%s.cfg", core.config_dir, game.name, config.device_tag);
+		else sprintf(path, "%s/%s.cfg", core.config_dir, game.name);
 		unlink(path);
+		LOG_info("deleted game config: %s\n", path);
 	}
 	else if (config.loaded==CONFIG_CONSOLE) {
-		sprintf(path, "%s/minarch.cfg", core.config_dir);
+		if (config.device_tag) sprintf(path, "%s/minarch-%s.cfg", core.config_dir, config.device_tag);
+		else sprintf(path, "%s/minarch.cfg", core.config_dir);
 		unlink(path);
+		LOG_info("deleted console config: %s\n", path);
 	}
 	config.loaded = CONFIG_NONE;
 	
@@ -1319,6 +1370,34 @@ static void Config_restore(void) {
 	renderer.dst_p = 0;
 }
 
+///////////////////////////////
+static struct Special {
+	int palette_updated;
+} special;
+static void Special_updatedDMGPalette(int frames) {
+	// LOG_info("Special_updatedDMGPalette(%i)\n", frames);
+	special.palette_updated = frames; // must wait a few frames
+}
+static void Special_refreshDMGPalette(void) {
+	special.palette_updated -= 1;
+	if (special.palette_updated>0) return;
+	
+	int rgb = getInt("/tmp/dmg_grid_color");
+	GFX_setEffectColor(rgb);
+}
+static void Special_init(void) {
+	if (special.palette_updated>1) special.palette_updated = 1;
+	// else if (exactMatch((char*)core.tag, "GBC"))  {
+	// 	putInt("/tmp/dmg_grid_color",0xF79E);
+	// 	special.palette_updated = 1;
+	// }
+}
+static void Special_render(void) {
+	if (special.palette_updated) Special_refreshDMGPalette();
+}
+static void Special_quit(void) {
+	system("rm -f /tmp/dmg_grid_color");
+}
 ///////////////////////////////
 
 static  int Option_getValueIndex(Option* item, const char* value) {
@@ -1531,6 +1610,8 @@ static void OptionList_setOptionRawValue(OptionList* list, const char* key, int 
 		list->changed = 1;
 		// LOG_info("\tRAW SET %s (%s) TO %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
 		// if (list->on_set) list->on_set(list, key);
+
+		if (exactMatch((char*)core.tag, "GB") && containsString(item->key, "palette")) Special_updatedDMGPalette(3); // from options
 	}
 	else LOG_info("unknown option %s \n", key);
 }
@@ -1539,8 +1620,10 @@ static void OptionList_setOptionValue(OptionList* list, const char* key, const c
 	if (item) {
 		Option_setValue(item, value);
 		list->changed = 1;
-		LOG_info("\tSET %s (%s) TO %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
+		// LOG_info("\tSET %s (%s) TO %s (%s)\n", item->name, item->key, item->labels[item->value], item->values[item->value]);
 		// if (list->on_set) list->on_set(list, key);
+		
+		if (exactMatch((char*)core.tag, "GB") && containsString(item->key, "palette")) Special_updatedDMGPalette(2); // from core
 	}
 	else LOG_info("unknown option %s \n", key);
 }
@@ -1640,7 +1723,8 @@ static void input_poll_callback(void) {
 						break;
 					case SHORTCUT_CYCLE_SCALE:
 						screen_scaling += 1;
-						if (screen_scaling>=SCALE_COUNT) screen_scaling -= SCALE_COUNT;
+						int count = config.frontend.options[FE_OPT_SCALING].count;
+						if (screen_scaling>=count) screen_scaling -= count;
 						Config_syncFrontend(config.frontend.options[FE_OPT_SCALING].key, screen_scaling);
 						break;
 					case SHORTCUT_CYCLE_EFFECT:
@@ -1810,7 +1894,6 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 		if (out) {
 			*out = core.bios_dir;
 		}
-		
 		break;
 	}
 	case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: { /* 10 */
@@ -1931,6 +2014,19 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 	// RETRO_ENVIRONMENT_GET_LANGUAGE 39
 	case RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER: { /* (40 | RETRO_ENVIRONMENT_EXPERIMENTAL) */
 		// puts("RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER");
+		break;
+	}
+	
+	case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE: {
+		// fixes fbneo save state graphics corruption
+		// puts("RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE");
+		int *out_p = (int *)data;
+		if (out_p) {
+			int out = 0;
+			out |= RETRO_AV_ENABLE_VIDEO;
+			out |= RETRO_AV_ENABLE_AUDIO;
+			*out_p = out;
+		}
 		break;
 	}
 	
@@ -2062,6 +2158,24 @@ static bool environment_callback(unsigned cmd, void *data) { // copied from pico
 		return false;
 	}
 	return true;
+}
+
+///////////////////////////////
+
+static void hdmimon(void) {
+	// handle HDMI change
+	static int had_hdmi = -1;
+	int has_hdmi = GetHDMI();
+	if (had_hdmi==-1) had_hdmi = has_hdmi;
+	if (has_hdmi!=had_hdmi) {
+		had_hdmi = has_hdmi;
+
+		LOG_info("restarting after HDMI change...\n");
+		Menu_beforeSleep();
+		sleep(4);
+		show_menu = 0;
+		quit = 1;
+	}
 }
 
 ///////////////////////////////
@@ -2356,9 +2470,11 @@ static void blitBitmapText(char* text, int ox, int oy, uint16_t* data, int strid
 	if (oy<0) oy = height-h+oy;
 	
 	data += oy * stride + ox;
+	uint16_t* row = data - stride; // TODO: this will crash and burn if ox,oy==0,0 but is fine as used currently :sweat_smile:
+	memset(row-1, 0, (w+2)*2);
 	for (int y=0; y<CHAR_HEIGHT; y++) {
-		uint16_t* row = data + y * stride;
-		memset(row, 0, w*2);
+		row = data + y * stride;
+		memset(row-1, 0, (w+2)*2);
 		for (int i=0; i<len; i++) {
 			const char* c = bitmap_font[text[i]];
 			for (int x=0; x<CHAR_WIDTH; x++) {
@@ -2369,6 +2485,8 @@ static void blitBitmapText(char* text, int ox, int oy, uint16_t* data, int strid
 			row += LETTERSPACING;
 		}
 	}
+	row = data + CHAR_HEIGHT * stride;
+	memset(row-1, 0, (w+2)*2);
 }
 
 ///////////////////////////////
@@ -2658,6 +2776,8 @@ static void selectScaler(int src_w, int src_h, int src_p) {
 static void video_refresh_callback_main(const void *data, unsigned width, unsigned height, size_t pitch) {
 	// return;
 	
+	Special_render();
+	
 	// static int tmp_frameskip = 0;
 	// if ((tmp_frameskip++)%2) return;
 	
@@ -2761,6 +2881,7 @@ static void audio_sample_callback(int16_t left, int16_t right) {
 static size_t audio_sample_batch_callback(const int16_t *data, size_t frames) { 
 	if (!fast_forward) return SND_batchSamples((const SND_Frame*)data, frames);
 	else return frames;
+	// return frames;
 };
 
 ///////////////////////////////////////
@@ -3062,6 +3183,8 @@ static int Menu_message(char* message, char** pairs) {
 			dirty = 0;
 		}
 		else GFX_sync();
+		
+		hdmimon();
 	}
 	GFX_setMode(MODE_MENU);
 	return MENU_CALLBACK_NOP; // TODO: this should probably be an arg
@@ -3230,6 +3353,7 @@ int OptionControls_bind(MenuList* list, int i) {
 			}
 		}
 		GFX_sync();
+		hdmimon();
 	}
 	return MENU_CALLBACK_NEXT_ITEM;
 }
@@ -3342,6 +3466,7 @@ static int OptionShortcuts_bind(MenuList* list, int i) {
 			}
 		}
 		GFX_sync();
+		hdmimon();
 	}
 	return MENU_CALLBACK_NEXT_ITEM;
 }
@@ -3841,6 +3966,7 @@ static int Menu_options(MenuList* list) {
 			dirty = 0;
 		}
 		else GFX_sync();
+		hdmimon();
 	}
 	
 	// GFX_clearAll();
@@ -4067,7 +4193,7 @@ static void Menu_loadState(void) {
 }
 
 static char* getAlias(char* path, char* alias) {
-	LOG_info("alias path: %s\n", path);
+	// LOG_info("alias path: %s\n", path);
 	char* tmp;
 	char map_path[256];
 	strcpy(map_path, path);
@@ -4075,11 +4201,11 @@ static char* getAlias(char* path, char* alias) {
 	if (tmp) {
 		tmp += 1;
 		strcpy(tmp, "map.txt");
-		LOG_info("map_path: %s\n", map_path);
+		// LOG_info("map_path: %s\n", map_path);
 	}
 	char* file_name = strrchr(path,'/');
 	if (file_name) file_name += 1;
-	LOG_info("file_name: %s\n", file_name);
+	// LOG_info("file_name: %s\n", file_name);
 	
 	if (exists(map_path)) {
 		FILE* file = fopen(map_path, "r");
@@ -4418,6 +4544,7 @@ static void Menu_loop(void) {
 			dirty = 0;
 		}
 		else GFX_sync();
+		hdmimon();
 	}
 	
 	SDL_FreeSurface(preview);
@@ -4569,9 +4696,9 @@ int main(int argc , char* argv[]) {
 
 	screen = GFX_init(MODE_MENU);
 	PAD_init();
-	DEVICE_WIDTH = screen->w; // yea or nay?
-	DEVICE_HEIGHT = screen->h; // yea or nay?
-	DEVICE_PITCH = screen->pitch; // yea or nay?
+	DEVICE_WIDTH = screen->w;
+	DEVICE_HEIGHT = screen->h;
+	DEVICE_PITCH = screen->pitch;
 	// LOG_info("DEVICE_SIZE: %ix%i (%i)\n", DEVICE_WIDTH,DEVICE_HEIGHT,DEVICE_PITCH);
 	
 	VIB_init();
@@ -4582,13 +4709,13 @@ int main(int argc , char* argv[]) {
 	// Overrides_init();
 	
 	Core_open(core_path, tag_name);
-	Game_open(rom_path);
+	Game_open(rom_path); // nes tries to load gamegenie setting before this returns ffs
 	if (!game.is_open) goto finish;
 	
 	simple_mode = exists(SIMPLE_MODE_PATH);
 	
 	// restore options
-	Config_load();
+	Config_load(); // before init?
 	Config_init();
 	Config_readOptions(); // cores with boot logo option (eg. gb) need to load options early
 	setOverclock(overclock);
@@ -4627,6 +4754,8 @@ int main(int argc , char* argv[]) {
 	// for better frame pacing?
 	GFX_clearAll();
 	GFX_flip(screen);
+	
+	Special_init(); // after config
 	
 	sec_start = SDL_GetTicks();
 	while (!quit) {
@@ -4680,6 +4809,8 @@ int main(int argc , char* argv[]) {
 			}
 		}
 		// LOG_info("frame duration: %ims\n", SDL_GetTicks()-frame_start);
+		
+		hdmimon();
 	}
 	
 	Menu_quit();
@@ -4695,6 +4826,8 @@ finish:
 	
 	Config_quit();
 	
+	Special_quit();
+
 	MSG_quit();
 	PWR_quit();
 	VIB_quit();

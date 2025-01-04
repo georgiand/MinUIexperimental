@@ -1439,6 +1439,10 @@ static void Menu_quit(void) {
 ///////////////////////////////////////
 
 int main (int argc, char *argv[]) {
+	// LOG_info("time from launch to:\n");
+	// unsigned long main_begin = SDL_GetTicks();
+	// unsigned long first_draw = 0;
+	
 	if (autoResume()) return 0; // nothing to do
 	
 	simple_mode = exists(SIMPLE_MODE_PATH);
@@ -1447,13 +1451,19 @@ int main (int argc, char *argv[]) {
 	InitSettings();
 	
 	SDL_Surface* screen = GFX_init(MODE_MAIN);
+	// LOG_info("- graphics init: %lu\n", SDL_GetTicks() - main_begin);
+	
 	PAD_init();
+	// LOG_info("- input init: %lu\n", SDL_GetTicks() - main_begin);
+	
 	PWR_init();
 	if (!HAS_POWER_BUTTON && !simple_mode) PWR_disableSleep();
+	// LOG_info("- power init: %lu\n", SDL_GetTicks() - main_begin);
 	
 	SDL_Surface* version = NULL;
 	
 	Menu_init();
+	// LOG_info("- menu init: %lu\n", SDL_GetTicks() - main_begin);
 	
 	// now that (most of) the heavy lifting is done, take a load off
 	PWR_setCPUSpeed(CPU_SPEED_MENU);
@@ -1464,6 +1474,8 @@ int main (int argc, char *argv[]) {
 	int show_version = 0;
 	int show_setting = 0; // 1=brightness,2=volume
 	int was_online = PLAT_isOnline();
+	
+	// LOG_info("- loop start: %lu\n", SDL_GetTicks() - main_begin);
 	while (!quit) {
 		GFX_startFrame();
 		unsigned long now = SDL_GetTicks();
@@ -1825,6 +1837,25 @@ int main (int argc, char *argv[]) {
 			dirty = 0;
 		}
 		else GFX_sync();
+		
+		// if (!first_draw) {
+		// 	first_draw = SDL_GetTicks();
+		// 	LOG_info("- first draw: %lu\n", first_draw - main_begin);
+		// }
+		
+		// handle HDMI change
+		static int had_hdmi = -1;
+		int has_hdmi = GetHDMI();
+		if (had_hdmi==-1) had_hdmi = has_hdmi;
+		if (has_hdmi!=had_hdmi) {
+			had_hdmi = has_hdmi;
+
+			Entry* entry = top->entries->items[top->selected];
+			LOG_info("restarting after HDMI change... (%s)\n", entry->path);
+			saveLast(entry->path); // NOTE: doesn't work in Recents (by design)
+			sleep(4);
+			quit = 1;
+		}
 	}
 	
 	if (version) SDL_FreeSurface(version);

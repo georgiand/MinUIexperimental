@@ -11,7 +11,7 @@ endif
 endif
 
 ifeq (,$(PLATFORMS))
-PLATFORMS = miyoomini trimuismart rg35xx rg35xxplus tg5040 rgb30 m17 gkdpixel my282 magicmini
+PLATFORMS = miyoomini trimuismart rg35xx rg35xxplus tg5040 tg3040 rgb30 m17 gkdpixel my282 magicmini
 endif
 
 ###########################################################
@@ -24,6 +24,7 @@ RELEASE_DOT:=$(shell find -E ./releases/. -regex ".*/${RELEASE_BASE}-[0-9]+-base
 RELEASE_NAME=$(RELEASE_BASE)-$(RELEASE_DOT)
 
 ###########################################################
+
 .PHONY: build
 
 export MAKEFLAGS=--no-print-directory
@@ -34,7 +35,7 @@ shell:
 	make -f makefile.toolchain PLATFORM=$(PLATFORM)
 
 name: 
-	echo $(RELEASE_NAME)
+	@echo $(RELEASE_NAME)
 
 build:
 	# ----------------------------------------------------
@@ -110,7 +111,6 @@ done:
 	say "done" 2>/dev/null || true
 
 special:
-	# ----------------------------------------------------
 	# setup miyoomini/trimui family .tmp_update in BOOT
 	mv ./build/BOOT/common ./build/BOOT/.tmp_update
 	mv ./build/BOOT/miyoo ./build/BASE/
@@ -121,9 +121,11 @@ special:
 
 tidy:
 	# ----------------------------------------------------
-	# remove systems we're not ready to support yet
-	
-	# TODO: tmp, figure out a cleaner way to do this
+	# copy update from rg35xxplus to old rg40xxcube bin so old cards update properly
+	mkdir -p ./build/SYSTEM/rg40xxcube/bin/
+	cp ./build/SYSTEM/rg35xxplus/bin/install.sh ./build/SYSTEM/rg40xxcube/bin/
+
+	# remove various detritus
 	rm -rf ./build/EXTRAS/Tools/tg5040/Developer.pak
 
 package: tidy
@@ -151,63 +153,10 @@ package: tidy
 	cd ./build/EXTRAS && zip -r ../../releases/$(RELEASE_NAME)-extras.zip Bios Emus Roms Saves Tools README.txt
 	echo "$(RELEASE_NAME)" > ./build/latest.txt
 	
-
 ###########################################################
 
-# TODO: make this a template like the cores makefile?
-
-rg35xx:
+.DEFAULT:
 	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-rg35xxplus:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-miyoomini:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-trimuismart:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-rgb30:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-tg5040:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-m17:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-gkdpixel:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-my282:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-magicmini:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
-tg3040:
-	# ----------------------------------------------------
-	make common PLATFORM=$@
-	# ----------------------------------------------------
-
+	# $@
+	@echo "$(PLATFORMS)" | grep -q "\b$@\b" && (make common PLATFORM=$@) || (exit 1)
+	

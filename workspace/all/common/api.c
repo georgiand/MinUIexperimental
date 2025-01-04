@@ -221,6 +221,9 @@ void GFX_sync(void) {
 	}
 }
 
+FALLBACK_IMPLEMENTATION int PLAT_supportsOverscan(void) { return 0; }
+FALLBACK_IMPLEMENTATION void PLAT_setEffectColor(int next_color) { }
+
 int GFX_truncateText(TTF_Font* font, const char* in_name, char* out_name, int max_width, int padding) {
 	int text_width;
 	strcpy(out_name, in_name);
@@ -1069,7 +1072,8 @@ void SND_init(double sample_rate, double frame_rate) { // plat_sound_init
 	}
 	LOG_info("Current audio driver: %s\n", SDL_GetCurrentAudioDriver());
 #endif	
-
+	
+	memset(&snd, 0, sizeof(struct SND_Context));
 	snd.frame_rate = frame_rate;
 
 	SDL_AudioSpec spec_in;
@@ -1113,6 +1117,7 @@ PAD_Context pad;
 
 #define AXIS_DEADZONE 0x4000
 void PAD_setAnalog(int neg_id,int pos_id,int value,int repeat_at) {
+	// LOG_info("neg %i pos %i value %i\n", neg_id, pos_id, value);
 	int neg = 1 << neg_id;
 	int pos = 1 << pos_id;	
 	if (value>AXIS_DEADZONE) { // pressing
@@ -1203,8 +1208,10 @@ FALLBACK_IMPLEMENTATION void PLAT_pollInput(void) {
 			else if (code==CODE_MENU_ALT)	{ btn = BTN_MENU; 			id = BTN_ID_MENU; }
 			else if (code==CODE_L1)			{ btn = BTN_L1; 			id = BTN_ID_L1; }
 			else if (code==CODE_L2)			{ btn = BTN_L2; 			id = BTN_ID_L2; }
+			else if (code==CODE_L3)			{ btn = BTN_L3; 			id = BTN_ID_L3; }
 			else if (code==CODE_R1)			{ btn = BTN_R1; 			id = BTN_ID_R1; }
 			else if (code==CODE_R2)			{ btn = BTN_R2; 			id = BTN_ID_R2; }
+			else if (code==CODE_R3)			{ btn = BTN_R3; 			id = BTN_ID_R3; }
 			else if (code==CODE_PLUS)		{ btn = BTN_PLUS; 			id = BTN_ID_PLUS; }
 			else if (code==CODE_MINUS)		{ btn = BTN_MINUS; 			id = BTN_ID_MINUS; }
 			else if (code==CODE_POWER)		{ btn = BTN_POWER; 			id = BTN_ID_POWER; }
@@ -1226,10 +1233,13 @@ FALLBACK_IMPLEMENTATION void PLAT_pollInput(void) {
 			else if (joy==JOY_SELECT)	{ btn = BTN_SELECT; 		id = BTN_ID_SELECT; }
 			else if (joy==JOY_MENU)		{ btn = BTN_MENU; 			id = BTN_ID_MENU; }
 			else if (joy==JOY_MENU_ALT) { btn = BTN_MENU; 			id = BTN_ID_MENU; }
+			else if (joy==JOY_MENU_ALT2){ btn = BTN_MENU; 			id = BTN_ID_MENU; }
 			else if (joy==JOY_L1)		{ btn = BTN_L1; 			id = BTN_ID_L1; }
 			else if (joy==JOY_L2)		{ btn = BTN_L2; 			id = BTN_ID_L2; }
+			else if (joy==JOY_L3)		{ btn = BTN_L3; 			id = BTN_ID_L3; }
 			else if (joy==JOY_R1)		{ btn = BTN_R1; 			id = BTN_ID_R1; }
 			else if (joy==JOY_R2)		{ btn = BTN_R2; 			id = BTN_ID_R2; }
+			else if (joy==JOY_R3)		{ btn = BTN_R3; 			id = BTN_ID_R3; }
 			else if (joy==JOY_PLUS)		{ btn = BTN_PLUS; 			id = BTN_ID_PLUS; }
 			else if (joy==JOY_MINUS)	{ btn = BTN_MINUS; 			id = BTN_ID_MINUS; }
 			else if (joy==JOY_POWER)	{ btn = BTN_POWER; 			id = BTN_ID_POWER; }
@@ -1477,6 +1487,8 @@ void PWR_update(int* _dirty, int* _show_setting, PWR_callback_t before_sleep, PW
 	static uint32_t setting_shown_at = 0; // timestamp when settings started being shown
 	static uint32_t power_pressed_at = 0; // timestamp when power button was just pressed
 	static uint32_t mod_unpressed_at = 0; // timestamp of last time settings modifier key was NOT down
+	static uint32_t was_muted = -1;
+	if (was_muted==-1) was_muted = GetMute();
 	
 	static int was_charging = -1;
 	if (was_charging==-1) was_charging = pwr.is_charging;
@@ -1551,6 +1563,13 @@ void PWR_update(int* _dirty, int* _show_setting, PWR_callback_t before_sleep, PW
 		else {
 			show_setting = 2;
 		}
+	}
+	
+	int muted = GetMute();
+	if (muted!=was_muted) {
+		was_muted = muted;
+		show_setting = 2;
+		setting_shown_at = now;
 	}
 	
 	if (show_setting) dirty = 1; // shm is slow or keymon is catching input on the next frame
@@ -1681,7 +1700,7 @@ void PWR_enableAutosleep(void) {
 	pwr.can_autosleep = 1;
 }
 int PWR_preventAutosleep(void) {
-	return pwr.is_charging || !pwr.can_autosleep;
+	return pwr.is_charging || !pwr.can_autosleep || GetHDMI();
 }
 
 // updated by PWR_updateBatteryStatus()
@@ -1697,6 +1716,6 @@ int PWR_getBattery(void) { // 10-100 in 10-20% fragments
 // TODO: tmp? move to individual platforms or allow overriding like PAD_poll/PAD_wake?
 int PLAT_setDateTime(int y, int m, int d, int h, int i, int s) {
 	char cmd[512];
-	sprintf(cmd, "date -u -s '%d-%d-%d %d:%d:%d'; hwclock --utc -w", y,m,d,h,i,s);
+	sprintf(cmd, "date -s '%d-%d-%d %d:%d:%d'; hwclock --utc -w", y,m,d,h,i,s);
 	system(cmd);
 }

@@ -1,4 +1,4 @@
-MinUI is a minimal launcher for the Trimui Smart (and Pro), the Miyoo Mini (and Plus) and A30, the Powkiddy RGB30, the M17, the MagicX XU Mini M, and the Anbernic RG*XX family--all from the same SD card. Why? Why not?
+MinUI is a minimal launcher for the Trimui Smart (and Pro) and Brick, the Miyoo Mini (and Plus) and A30, the Powkiddy RGB30, the M17, the MagicX XU Mini M, and the Anbernic RG*XX family--all from the same SD card. Why? Why not?
 
 Source:
 https://github.com/shauninman/minui
@@ -38,7 +38,7 @@ MinUI is meant to be used with a heavily modified stock SD card that goes into t
 
 Copy "MinUI.zip" (without unzipping) to the root of the SD card that goes into the right slot (labeled TF2/EXT).
 
-TRIMUI SMART / TRIMUI SMART PRO
+TRIMUI SMART / TRIMUI SMART PRO / TRIMUI BRICK
 
 Copy the "trimui" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
 
@@ -60,7 +60,7 @@ MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware.
 
 Copy "/rg35xx/dmenu.bin" (just the file) to the root of the MISC partition of the TF1 card. Copy "MinUI.zip" (without unzipping) to the root of the TF2 card.
 
-RG35XX PLUS / RG35XX H / RG35XX 2024 / RG28XX / RG35XXSP / RG40XXH
+RG35XX PLUS / RG35XX H / RG35XX 2024 / RG28XX / RG35XXSP / RG40XXH / RGCUBEXX / RG34XX
 
 MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware. You can use the stock TF1 card, reports of its poor quality are greatly exaggerated and, as long as you are using the recommended two card setup, no userdata is stored on it. (Note that the PLUS/H/2024/SP stock TF1 is not compatible with the 28XX/40XXH and vice versa.)
 
@@ -91,7 +91,7 @@ For devices without a dedicated MENU button
 	RGB30: use L3 or R3 for MENU
 	M17:   use + or - for MENU
 
-RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL / MIYOO A30 / MAGICX XU MINI M
+RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / TRIMUI BRICK / GKD PIXEL / MIYOO A30 / MAGICX XU MINI M
   
   Brightness: MENU + VOLUME UP
                   or VOLUME DOWN
@@ -101,7 +101,7 @@ MIYOO MINI / TRIMUI SMART / M17
   Volume: SELECT + L or R
   Brightness: START + L or R
 
-RGB30 / MIYOO MINI (PLUS) / RG35XX (PLUS) / TRIMUI SMART PRO / GKD PIXEL / MIYOO A30
+RGB30 / MIYOO MINI (PLUS) / RG35XX (PLUS) / TRIMUI SMART PRO / TRIMUI BRICK / GKD PIXEL / MIYOO A30
   
   Sleep: POWER
   Wake: POWER
@@ -110,6 +110,10 @@ TRIMUI SMART / M17
   
   Sleep: MENU (twice)
   Wake: MENU
+
+TRIMUI SMART PRO / TRIMUI BRICK
+
+  Mute: FN switch (volume and rumble)
 
 ----------------------------------------
 Quicksave & auto-resume
@@ -136,9 +140,9 @@ Bios file names are case-sensitive:
   GBC: gbc_bios.bin
    MD: bios_CD_E.bin
        bios_CD_J.bin
-	   bios_CD_U.bin
+       bios_CD_U.bin
    PS: psxonpsp660.bin
-	
+
 ----------------------------------------
 Disc-based games
 
@@ -182,9 +186,9 @@ Display names
 
 Certain (unsupported arcade) cores require roms to use arcane file names. You can override the display name used throughout MinUI by creating a map.txt in the same folder as the files you want to rename. One line per file, `rom.ext` followed by a single tab followed by `Display Name`. You can hide a file by adding a `.` at the beginning of the display name. eg.
 	
-	neogeo.zip	.Neo Geo Bios
-	mslug.zip	Metal Slug
-	sf2.zip	Street Fighter II
+  neogeo.zip	.Neo Geo Bios
+  mslug.zip	Metal Slug
+  sf2.zip	Street Fighter II
 
 ----------------------------------------
 Simple mode
@@ -194,7 +198,7 @@ Not simple enough for you (or maybe your kids)? MinUI has a simple mode that hid
 ----------------------------------------
 Advanced
 
-MinUI can automatically run a user-authored shell script on boot. Just place a file named "auto.sh" in "/.userdata/<DEVICE>/".
+MinUI can automatically run a user-authored shell script on boot. Just place a file named "auto.sh" in "/.userdata/<DEVICE>/". If you're on Windows, make sure your text editor uses Unix line-endings (eg. `\n`), these devices usually choke on Windows line-endings (eg. `\r\n`).
 
 ----------------------------------------
 Thanks

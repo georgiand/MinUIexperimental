@@ -2,6 +2,12 @@
 
 TF1_PATH=/mnt/mmc # TF1/NO NAME partition
 TF2_PATH=/mnt/sdcard # TF2
+
+rm $TF1_PATH/log.txt
+touch $TF1_PATH/log.txt
+
+RGXX_MODEL=`strings /mnt/vendor/bin/dmenu.bin | grep ^RG`
+
 FLAG_PATH=$TF1_PATH/.minstalled
 SDCARD_PATH=$TF1_PATH
 SYSTEM_DIR=/.system
@@ -13,9 +19,6 @@ UPDATE_PATH=${SDCARD_PATH}${UPDATE_FRAG}
 # rm /mnt/sdcard
 # mkdir -p /mnt/sdcard
 # poweroff
-
-rm $TF1_PATH/log.txt
-touch $TF1_PATH/log.txt
 
 if [ -h $TF2_PATH ] && [ "$TF2_PATH" -ef "$TF1_PATH" ]; then
 	echo "deleting old TF2 -> TF1 symlink" >> $TF1_PATH/log.txt
@@ -62,6 +65,12 @@ if [ -f $UPDATE_PATH ]; then
 		;;
 	esac
 	
+	if [ "$RGXX_MODEL" = "RGcubexx" ]; then
+		SUFFIX="-s"
+	elif [ "$RGXX_MODEL" = "RG34xx" ]; then
+		SUFFIX="-w"
+	fi
+	
 	if [ ! -d $SYSTEM_PATH ]; then
 		ACTION=installing
 		echo "install MinUI" >> $TF1_PATH/log.txt
@@ -96,12 +105,13 @@ if [ -f $UPDATE_PATH ]; then
 	/tmp/unzip -o $UPDATE_PATH -d $SDCARD_PATH >> $TF1_PATH/log.txt
 	rm -f $UPDATE_PATH
 
-	ls -la $SDCARD_PATH >> $TF1_PATH/log.txt
+	# ls -la $SDCARD_PATH >> $TF1_PATH/log.txt
 	
 	# cd /tmp
 	# rm data installing updating bootlogo.bmp installing-r updating-r bootlogo-r.bmp unzip
 
 	# the updated system finishes the install/update
+	echo "finishing update..." >> $TF1_PATH/log.txt
 	$SYSTEM_PATH/bin/install.sh >> $TF1_PATH/log.txt
 fi
 

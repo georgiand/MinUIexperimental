@@ -123,10 +123,10 @@ void PLAT_pollInput(void) {
 			}
 			else if (type==EV_ABS) {
 				// LOG_info("axis: %i (%i)\n",code,value);
-				// else if (code==RAW_LSX) pad.laxis.x = (value / 4096) * 32767;
-				// else if (code==RAW_LSY) pad.laxis.y = (value / 4096) * 32767;
-				// else if (code==RAW_RSX) pad.raxis.x = (value / 4096) * 32767;
-				// else if (code==RAW_RSY) pad.raxis.y = (value / 4096) * 32767;
+				// else if (code==RAW_LSX) pad.laxis.x = (value * 32767) / 4096;
+				// else if (code==RAW_LSY) pad.laxis.y = (value * 32767) / 4096;
+				// else if (code==RAW_RSX) pad.raxis.x = (value * 32767) / 4096;
+				// else if (code==RAW_RSY) pad.raxis.y = (value * 32767) / 4096;
 				
 				btn = BTN_NONE; // already handled, force continue
 			}
@@ -268,7 +268,7 @@ void PLAT_quitVideo(void) {
 	SDL_DestroyWindow(vid.window);
 	SDL_Quit();
 
-	system("cat /dev/zero > /dev/fb0");
+	system("cat /dev/zero > /dev/fb0 2>/dev/null");
 }
 
 void PLAT_clearVideo(SDL_Surface* screen) {

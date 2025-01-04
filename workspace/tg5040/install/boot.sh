@@ -6,8 +6,10 @@ SDCARD_PATH="/mnt/SDCARD"
 UPDATE_PATH="$SDCARD_PATH/MinUI.zip"
 SYSTEM_PATH="$SDCARD_PATH/.system"
 
-# CPU_PATH=/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-# echo performance > "$CPU_PATH"
+echo userspace > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+CPU_PATH=/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+CPU_SPEED_PERF=2000000
+echo $CPU_SPEED_PERF > $CPU_PATH
 
 # install/update
 if [ -f "$UPDATE_PATH" ]; then 
@@ -15,8 +17,10 @@ if [ -f "$UPDATE_PATH" ]; then
 	export LD_LIBRARY_PATH=/usr/trimui/lib:$LD_LIBRARY_PATH
 	export PATH=/usr/trimui/bin:$PATH
 
+	# leds_off
+	echo 0 > /sys/class/led_anim/max_scale
+	
 	cd $(dirname "$0")/$PLATFORM
-	./leds_off
 	if [ -d "$SYSTEM_PATH" ]; then
 		./show.elf ./updating.png
 	else
