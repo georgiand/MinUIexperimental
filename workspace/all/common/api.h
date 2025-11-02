@@ -22,7 +22,9 @@ void LOG_note(int level, const char* fmt, ...);
 ///////////////////////////////
 
 #define PAGE_COUNT	2
+#ifndef PAGE_SCALE
 #define PAGE_SCALE	3
+#endif
 #define PAGE_WIDTH	(FIXED_WIDTH * PAGE_SCALE)
 #define PAGE_HEIGHT	(FIXED_HEIGHT * PAGE_SCALE)
 #define PAGE_PITCH	(PAGE_WIDTH * FIXED_BPP)
@@ -90,6 +92,8 @@ enum {
 	ASSET_SCROLL_DOWN,
 	
 	ASSET_WIFI,
+	
+	ASSET_COUNT,
 };
 
 typedef struct GFX_Fonts {
@@ -206,6 +210,17 @@ typedef struct SND_Frame {
 void SND_init(double sample_rate, double frame_rate);
 size_t SND_batchSamples(const SND_Frame* frames, size_t frame_count);
 void SND_quit(void);
+
+///////////////////////////////
+
+typedef struct LID_Context {
+	int has_lid;
+	int is_open;
+} LID_Context;
+extern LID_Context lid;
+
+void PLAT_initLid(void);
+int PLAT_lidChanged(int* state);
 
 ///////////////////////////////
 

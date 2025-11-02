@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <linux/input.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include <msettings.h>
 
@@ -21,7 +22,9 @@
 #define BRIGHTNESS_MIN 	0
 #define BRIGHTNESS_MAX 	10
 
-#define CODE_MENU		316
+#define CODE_MENU0		314
+#define CODE_MENU1		315
+#define CODE_MENU2		316
 #define CODE_PLUS		115
 #define CODE_MINUS		114
 #define CODE_MUTE		1
@@ -40,6 +43,9 @@
 static int inputs[INPUT_COUNT] = {};
 static struct input_event ev;
 
+static volatile int quit = 0;
+static void on_term(int sig) { quit = 1; }
+
 static int getInt(char* path) {
 	int i = 0;
 	FILE *file = fopen(path, "r");
@@ -57,7 +63,7 @@ static void* watchMute(void *arg) {
 	is_muted = was_muted = getInt(MUTE_STATE_PATH);
 	SetMute(is_muted);
 	
-	while(1) {
+	while(!quit) {
 		usleep(200000); // 5 times per second
 		
 		is_muted = getInt(MUTE_STATE_PATH);
@@ -67,10 +73,14 @@ static void* watchMute(void *arg) {
 		}
 	}
 	
-	return 0;
+	return NULL;
 }
 
 int main (int argc, char *argv[]) {
+	struct sigaction sa = {0};
+	sa.sa_handler = on_term;
+	sigaction(SIGTERM, &sa, NULL);
+	
 	InitSettings();
 	pthread_create(&mute_pt, NULL, &watchMute, NULL);
 	
@@ -101,7 +111,7 @@ int main (int argc, char *argv[]) {
 	then = tod.tv_sec * 1000 + tod.tv_usec / 1000; // essential SDL_GetTicks()
 	ignore = 0;
 	
-	while (1) {
+	while (!quit) {
 		gettimeofday(&tod, NULL);
 		now = tod.tv_sec * 1000 + tod.tv_usec / 1000;
 		if (now-then>1000) ignore = 1; // ignore input that arrived during sleep
@@ -125,7 +135,9 @@ int main (int argc, char *argv[]) {
 				if (( ev.type != EV_KEY ) || ( val > REPEAT )) continue;
 				printf("code: %i (%i)\n", ev.code, val); fflush(stdout);
 				switch (ev.code) {
-					case CODE_MENU:
+					case CODE_MENU0:
+					case CODE_MENU1:
+					case CODE_MENU2:
 						menu_pressed = val;
 					break;
 					break;
@@ -188,4 +200,11 @@ int main (int argc, char *argv[]) {
 		
 		usleep(16666); // 60fps
 	}
+	
+	for (int i=0; i<INPUT_COUNT; i++) {
+		close(inputs[i]);
+	}
+	
+	pthread_cancel(mute_pt);
+	pthread_join(mute_pt, NULL);
 }

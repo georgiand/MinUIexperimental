@@ -13,7 +13,7 @@ cd $DIR
 
 {
 
-LOGO_PATH=$DIR/bootlogo.bmp
+LOGO_PATH=$DIR/$DEVICE/bootlogo.bmp
 if [ ! -f $LOGO_PATH ]; then
 	echo "No logo.bmp available. Aborted."
 	exit 1
@@ -33,4 +33,5 @@ echo "Done."
 # self-destruct
 mv $DIR $DIR.disabled
 
+rm -f /tmp/minui_exec
 reboot

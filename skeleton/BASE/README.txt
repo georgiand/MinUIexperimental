@@ -1,4 +1,4 @@
-MinUI is a minimal launcher for the Trimui Smart (and Pro) and Brick, the Miyoo Mini (and Plus) and A30, the Powkiddy RGB30, the M17, the MagicX XU Mini M, and the Anbernic RG*XX family--all from the same SD card. Why? Why not?
+MinUI is a minimal launcher for the Trimui Smart (and Pro) and Brick, the Miyoo Mini (and Plus), A30, and Flip, the Powkiddy RGB30, the M17, the MagicX XU Mini M and Mini Zero 28, and the Anbernic RG*XX family--all from the same SD card. Why? Why not?
 
 Source:
 https://github.com/shauninman/minui
@@ -12,7 +12,7 @@ MinUI has two essential parts: an installer/updater zip archive named "MinUI.zip
 
 On devices that support two SD cards (eg. RG35XX) I will use the name "TF1" to refer to the card that goes into slot one of the device. All other instances of "SD card" or "primary card" refer to the card that goes into the second slot or to the sole SD card of devices that only support a single card. To be able to use MinUI from a single SD card on multiple devices you must install it on the second card of devices that support two SD cards.
 
-The primary card should be a reputable brand and freshly formatted as FAT32.
+The primary card should be a reputable brand and freshly formatted as FAT32 (MBR).
 
 CAVEATS
 
@@ -26,7 +26,7 @@ RGB30
 
 MinUI is meant to be used with Moss installed on the SD card that goes into the left slot (labeled TF-OS) of the RGB30. Download and flash the latest version:
 
-	https://github.com/shauninman/Moss/releases/
+	https://github.com/shauninman/Moss/releases
 
 Copy "MinUI.zip" (without unzipping) to the root of the SD card that goes into the right slot (labeled TFGAME) of the RGB30.
 
@@ -37,6 +37,14 @@ MinUI is meant to be used with a heavily modified stock SD card that goes into t
 	https://github.com/shauninman/Moss-magicmini/releases
 
 Copy "MinUI.zip" (without unzipping) to the root of the SD card that goes into the right slot (labeled TF2/EXT).
+
+MAGICX MINI ZERO 28
+
+MinUI is meant to be used with Moss installed on the SD card that goes into the left slot (labeled TF1/INT). Download and flash the latest version:
+
+	https://github.com/shauninman/Moss-zero28/releases
+
+Copy the "magicx" folder and "MinUI.zip" (without unzipping) to the root of the SD card that goes into the right slot (labeled TF2/EXT).
 
 TRIMUI SMART / TRIMUI SMART PRO / TRIMUI BRICK
 
@@ -50,17 +58,21 @@ MIYOO MINI PLUS
 
 Copy the "miyoo354" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
 
+If you have a device with working RTC, you can enable it by creating an empty file named "enable-rtc" (no extension) in "/.userdata/miyoomini/".
+
+MIYOO FLIP
+
+Copy the "miyoo355" folder and "MinUI.zip" (without unzipping) to the root of the SD card. Put the SD card into the right slot (beneath the power button).
+
+MIYOO MINI FLIP
+
+Copy the "miyoo285" folder and "MinUI.zip" (without unzipping) to the root of the SD card.
+
 M17
 
 Copy the "em_ui.sh" file and "MinUI.zip" (without unzipping) to the root of the SD card.
 
-RG35XX
-
-MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware. You can use the stock TF1 card, reports of its poor quality are greatly exaggerated and, as long as you are using the recommended two card setup, no userdata is stored on it.
-
-Copy "/rg35xx/dmenu.bin" (just the file) to the root of the MISC partition of the TF1 card. Copy "MinUI.zip" (without unzipping) to the root of the TF2 card.
-
-RG35XX PLUS / RG35XX H / RG35XX 2024 / RG28XX / RG35XXSP / RG40XXH / RGCUBEXX / RG34XX
+RG35XX PLUS / RG35XX H / RG35XX 2024 / RG28XX / RG35XXSP / RG40XXH / RGCUBEXX / RG34XX / RG34XXSP
 
 MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware. You can use the stock TF1 card, reports of its poor quality are greatly exaggerated and, as long as you are using the recommended two card setup, no userdata is stored on it. (Note that the PLUS/H/2024/SP stock TF1 is not compatible with the 28XX/40XXH and vice versa.)
 
@@ -75,6 +87,12 @@ Backup your stock SD card (not just the "ROMS" partition but the entire thing). 
 Copy the "gkdpixel" folder and "MinUI.zip" (without unzipping) to the root of the "ROMS" partition of the SD card. (On the GKD Mini should be TF1.)
 
 Boot stock, navigate to the "APP" folder and launch "file manager". Then use the d-pad and A button to navigate to "/media/roms/gkdpixel". Highlight the "install.sh" file and press A to open a menu and select "Execute" to install MinUI.
+
+RG35XX (original)
+
+MinUI is meant to be installed over a fresh copy of the stock Anbernic firmware. You can use the stock TF1 card, reports of its poor quality are greatly exaggerated and, as long as you are using the recommended two card setup, no userdata is stored on it.
+
+Copy "/rg35xx/dmenu.bin" (just the file) to the root of the MISC partition of the TF1 card. Copy "MinUI.zip" (without unzipping) to the root of the TF2 card.
 
 ----------------------------------------
 Updating
@@ -91,7 +109,7 @@ For devices without a dedicated MENU button
 	RGB30: use L3 or R3 for MENU
 	M17:   use + or - for MENU
 
-RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / TRIMUI BRICK / GKD PIXEL / MIYOO A30 / MAGICX XU MINI M
+RGB30 / MIYOO MINI PLUS / RG35XX (PLUS) / TRIMUI SMART PRO / TRIMUI BRICK / GKD PIXEL / MIYOO A30 / MAGICX XU MINI M / MIYOO FLIP / MAGICX MINI ZERO 28
   
   Brightness: MENU + VOLUME UP
                   or VOLUME DOWN
@@ -101,7 +119,7 @@ MIYOO MINI / TRIMUI SMART / M17
   Volume: SELECT + L or R
   Brightness: START + L or R
 
-RGB30 / MIYOO MINI (PLUS) / RG35XX (PLUS) / TRIMUI SMART PRO / TRIMUI BRICK / GKD PIXEL / MIYOO A30
+RGB30 / MIYOO MINI (PLUS) / RG35XX (PLUS) / TRIMUI SMART PRO / TRIMUI BRICK / GKD PIXEL / MIYOO A30 / MAGICX XU MINI M / MIYOO FLIP / MAGICX MINI ZERO 28
   
   Sleep: POWER
   Wake: POWER

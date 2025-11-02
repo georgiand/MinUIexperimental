@@ -19,10 +19,15 @@ all:
 	cd ./all/minarch/ && make
 	cd ./all/clear_recent/ && make
 	cd ./all/set_poweroff_timeout/ && make
+	cd ./all/say/ && make
 
 clean:
 	cd ./all/minui/ && make clean
 	cd ./all/minarch/ && make clean
+	cd ./all/clock/ && make clean
+	cd ./all/minput/ && make clean
 	cd ./all/clear_recent/ && make clean
 	cd ./all/set_poweroff_timeout/ && make clean
+	cd ./all/syncsettings/ && make clean
+	cd ./all/say/ && make clean
 	cd ./$(PLATFORM) && make clean

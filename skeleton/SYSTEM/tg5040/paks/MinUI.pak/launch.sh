@@ -32,34 +32,32 @@ mkdir -p "$USERDATA_PATH"
 mkdir -p "$LOGS_PATH"
 mkdir -p "$SHARED_USERDATA_PATH/.minui"
 
-#######################################
+export TRIMUI_MODEL=`strings /usr/trimui/bin/MainUI | grep ^Trimui`
+if [ "$TRIMUI_MODEL" = "Trimui Brick" ]; then
+	export DEVICE="brick"
+fi
 
-#PD11 pull high for VCC-5v
-echo 107 > /sys/class/gpio/export
-echo -n out > /sys/class/gpio/gpio107/direction
-echo -n 1 > /sys/class/gpio/gpio107/value
+#######################################
 
 #rumble motor PH3
 echo 227 > /sys/class/gpio/export
 echo -n out > /sys/class/gpio/gpio227/direction
 echo -n 0 > /sys/class/gpio/gpio227/value
 
-#Left/Right Pad PD14/PD18
-echo 110 > /sys/class/gpio/export
-echo -n out > /sys/class/gpio/gpio110/direction
-echo -n 1 > /sys/class/gpio/gpio110/value
+if [ "$TRIMUI_MODEL" = "Trimui Smart Pro" ]; then
+	#Left/Right Pad PD14/PD18
+	echo 110 > /sys/class/gpio/export
+	echo -n out > /sys/class/gpio/gpio110/direction
+	echo -n 1 > /sys/class/gpio/gpio110/value
 
-echo 114 > /sys/class/gpio/export
-echo -n out > /sys/class/gpio/gpio114/direction
-echo -n 1 > /sys/class/gpio/gpio114/value
+	echo 114 > /sys/class/gpio/export
+	echo -n out > /sys/class/gpio/gpio114/direction
+	echo -n 1 > /sys/class/gpio/gpio114/value
+fi
 
 #DIP Switch PH19
 echo 243 > /sys/class/gpio/export
 echo -n in > /sys/class/gpio/gpio243/direction
-
-export LD_LIBRARY_PATH=/usr/trimui/lib
-cd /usr/trimui/bin
-./trimui_inputd &
 
 #######################################
 
@@ -68,6 +66,28 @@ export PATH=$SYSTEM_PATH/bin:/usr/trimui/bin:$PATH
 
 # leds_off
 echo 0 > /sys/class/led_anim/max_scale
+if [ "$TRIMUI_MODEL" = "Trimui Brick" ]; then
+	echo 0 > /sys/class/led_anim/max_scale_lr
+	echo 0 > /sys/class/led_anim/max_scale_f1f2
+fi
+
+# set default usb mode
+usb_device.sh
+
+# match stock audio
+tinymix set 9 1
+tinymix set 1 0
+
+# run stock keymon (in background) for a moment
+( keymon & PID=$!; sleep 1; kill -s TERM $PID ) &
+
+# start stock gpio input daemon
+mkdir -p /tmp/trimui_inputd
+trimui_inputd &
+
+# start stock hardware daemon
+# no effect but also no harm (so far)
+hardwareservice &
 
 echo userspace > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
 CPU_PATH=/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
@@ -77,7 +97,9 @@ echo $CPU_SPEED_PERF > $CPU_PATH
 # disable internet stuff
 killall MtpDaemon
 killall wpa_supplicant
-ifconfig wlan0 down
+killall udhcpc
+rfkill block bluetooth
+rfkill block wifi
 
 keymon.elf & # &> $SDCARD_PATH/keymon.txt &
 
@@ -97,7 +119,7 @@ NEXT_PATH="/tmp/next"
 touch "$EXEC_PATH"  && sync
 while [ -f $EXEC_PATH ]; do
 	minui.elf &> $LOGS_PATH/minui.txt
-	echo $CPU_SPEED_PERF > $CPU_PATH
+	[ -f $EXEC_PATH ] && echo $CPU_SPEED_PERF > $CPU_PATH
 	echo `date +'%F %T'` > "$DATETIME_PATH"
 	sync
 	
@@ -105,10 +127,10 @@ while [ -f $EXEC_PATH ]; do
 		CMD=`cat $NEXT_PATH`
 		eval $CMD
 		rm -f $NEXT_PATH
-		echo $CPU_SPEED_PERF > $CPU_PATH
+		[ -f $EXEC_PATH ] && echo $CPU_SPEED_PERF > $CPU_PATH
 		echo `date +'%F %T'` > "$DATETIME_PATH"
 		sync
 	fi
 done
 
-poweroff # just in case
+exec shutdown

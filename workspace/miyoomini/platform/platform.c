@@ -27,6 +27,7 @@
 #include <mi_sys.h>
 #include <mi_gfx.h>
 
+int is_560p = 0;
 int is_plus = 0;
 
 #define	pixelsPa	unused1
@@ -151,6 +152,22 @@ static inline void GFX_BlitSurfaceExec(SDL_Surface *src, SDL_Rect *srcrect, SDL_
 
 ///////////////////////////////
 
+#define LID_PATH "/sys/devices/soc0/soc/soc:hall-mh248/hallvalue"
+void PLAT_initLid(void) {
+	lid.has_lid = exists(LID_PATH);
+}
+int PLAT_lidChanged(int* state) {
+	if (lid.has_lid) {
+		int lid_open = getInt(LID_PATH);
+		if (lid_open!=lid.is_open) {
+			lid.is_open = lid_open;
+			if (state) *state = lid_open;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void PLAT_initInput(void) {
 	// buh
 }
@@ -179,8 +196,18 @@ static struct VID_Context {
 	int cleared;
 } vid;
 
+#define MODES_PATH "/sys/class/graphics/fb0/modes"
+static int hasMode(const char *path, const char *mode) {
+    FILE *f = fopen(path, "r"); if (!f) return 0;
+    char s[128];
+    while (fgets(s, sizeof s, f)) if (strstr(s, mode)) return fclose(f), 1;
+    fclose(f); return 0;
+}
+
 SDL_Surface* PLAT_initVideo(void) {
 	is_plus = exists("/customer/app/axp_test");
+	is_560p = hasMode(MODES_PATH, "752x560p") && exists(USERDATA_PATH "/enable-560p");
+	LOG_info("is 560p: %i\n", is_560p);
 	
 	putenv("SDL_HIDE_BATTERY=1"); // using MiniUI's custom SDL
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
@@ -446,6 +473,7 @@ int axp_read(unsigned char address) {
 
 ///////////////////////////////
 
+static int online = 0;
 void PLAT_getBatteryStatus(int* is_charging, int* charge) {
 	*is_charging = is_plus ? (axp_read(0x00) & 0x4) > 0 : getInt("/sys/devices/gpiochip0/gpio/gpio59/value");
 	
@@ -462,6 +490,10 @@ void PLAT_getBatteryStatus(int* is_charging, int* charge) {
 	// TODO: tmp
 	// *is_charging = 0;
 	// *charge = PWR_LOW_CHARGE;
+	
+	char status[16];
+	getFile("/sys/class/net/wlan0/operstate", status,16);
+	online = prefixMatch("up", status);
 }
 
 void PLAT_enableBacklight(int enable) {
@@ -493,14 +525,6 @@ void PLAT_powerOff(void) {
 }
 
 ///////////////////////////////
-
-// #define GOVERNOR_PATH "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-// void PLAT_setCPUSpeed(int speed) {
-// 	// TODO: this isn't quite right
-// 	if (speed==CPU_SPEED_MENU) putFile(GOVERNOR_PATH, "powersave");
-// 	else if (speed==CPU_SPEED_POWERSAVE) putFile(GOVERNOR_PATH, "ondemand");
-// 	else putFile(GOVERNOR_PATH, "performance");
-// }
 
 // copy/paste of 35XX version now that we have our own overclock.elf
 void PLAT_setCPUSpeed(int speed) {
@@ -541,9 +565,12 @@ int PLAT_pickSampleRate(int requested, int max) {
 }
 
 char* PLAT_getModel(void) {
-	return is_plus ? "Miyoo Mini Plus" : "Miyoo Mini";
+	char* model = getenv("MY_MODEL");
+	if (exactMatch(model,"MY285")) return "Miyoo Mini Flip";
+	else if (is_plus) return "Miyoo Mini Plus";
+	else return "Miyoo Mini";
 }
 
 int PLAT_isOnline(void) {
-	return 0;
+	return online;
 }
